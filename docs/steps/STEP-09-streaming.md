@@ -108,6 +108,29 @@ Live mode: in one terminal `docker compose run --rm pipeline stream --continuous
 in another `docker compose run --rm pipeline produce --rate 20`, and watch
 the dashboard's **Streaming** tab fill up.
 
+### What CI measured (GitHub runner, 4 cores, Spark 4.1.4, Kafka 4.1.2, 2026-11-22)
+
+The `test` job streams 3,000 order events; the `compose` job streams 1,000 inside Docker.
+
+| | test job | compose job |
+|---|---:|---:|
+| events | 3,000 | 1,000 |
+| messages sent (with injected duplicates) | 3,063 | 1,024 |
+| duplicates / late / malformed injected | 63 / 34 / 32 | 24 / 12 / 9 |
+| bronze records (every message kept) | 3,063 | 1,024 |
+| quarantined (malformed) | 32 | 9 |
+| silver events (valid and unique) | 2,968 | 991 |
+| daily revenue in Postgres | 414,831.77 | 173,548.57 |
+| producer's own total of valid unique events | 414,831.77 | 173,548.57 |
+| dropped by watermark | 0 | 0 |
+| time to process the topic (`availableNow`) | 10.8 s | 13.8 s |
+
+Every message lands in bronze, exactly the malformed ones are quarantined,
+the duplicates are gone from silver, and the revenue in Postgres equals the
+producer's total to the cent: exactly-once results from at-least-once input.
+Nothing was dropped by the watermark because 3 days is longer than the
+lateness injected (200 positions in the send order); exercise 1 changes that.
+
 ## 4. Exercises
 
 1. Produce with `--late-rate 0.05`, stream, and read `dropped by watermark`. Change `WINDOW_WATERMARK` to `"1 day"` and `"10 days"`. What changes, and what does each choice cost?

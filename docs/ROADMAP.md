@@ -21,8 +21,8 @@ against a campus-hire Data Engineer job description (see the mapping below).
 | 6 | SQL analysis and dashboard | 10 business questions in SQL (CTEs, window functions); Streamlit dashboard (as code, tested in CI) on the star schema and the data quality history | 03, 04 | **done** |
 | 7 | Performance tuning | Spark: partitioning, broadcast joins, AQE, skew, file sizing. SQL: indexes, `EXPLAIN ANALYZE`. Baseline vs tuned timings recorded | 03 (partitioning), 06 (join internals) | **done** |
 | 8 | Orchestration with Airflow | Airflow in Docker, DAG for the batch pipeline, retries, backfills, idempotent reruns | 02-workflow-orchestration (Zoomcamp uses Kestra; we use Airflow) | **done** |
-| 9 | Streaming | Redpanda/Kafka, order and payment event producer, Spark Structured Streaming with schema, watermark, dedupe and windowed metrics | 07-streaming | next |
-| 10 | Cloud platforms and wrap-up | Same Spark job on Databricks Free Edition; gold tables in a Snowflake trial; full CI; final numbers | Final project | |
+| 9 | Streaming | Kafka (KRaft), order event producer with injected duplicates, late and malformed messages, Spark Structured Streaming with schema, watermark, dedupe and windowed metrics | 07-streaming | **done** |
+| 10 | Cloud platforms and wrap-up | Same Spark job on Databricks Free Edition; gold tables in a Snowflake trial; full CI; final numbers | Final project | next |
 
 Steps 1 to 7 cover the job description's required skills and duties.
 Steps 8 to 10 cover its *preferred* qualifications; if time is short,
@@ -116,5 +116,5 @@ Each step note lists exact chapters and videos; this is the plan.
 | 6 | *SQL for Data Analysis* (Tanimura) | | **done** |
 | 7 | *Learning Spark* ch. 7; *High Performance Spark* | | **done** |
 | 8 | *Data Pipelines Pocket Reference*; Airflow docs | Hands-On Introduction: Data Engineering (Airflow) | **done** |
-| 9 | *Kafka: The Definitive Guide, 2nd Ed.*; *Learning Spark* ch. 8 | Apache Kafka Essential Training: Getting Started | next |
+| 9 | *Kafka: The Definitive Guide, 2nd Ed.*; *Learning Spark* ch. 8 | Apache Kafka Essential Training: Getting Started | **done** |
 | 10 | *Snowflake Data Engineering* (Manning, on O'Reilly); *Data Engineering Design Patterns* | | Databricks Free Edition docs, Snowflake trial docs |

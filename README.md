@@ -27,8 +27,8 @@ See the [roadmap](docs/ROADMAP.md).
 | 6 | [SQL analysis and dashboard](docs/steps/STEP-06-analysis-dashboard.md) | **done** |
 | 7 | [Performance tuning (Spark and SQL)](docs/steps/STEP-07-performance.md) | **done** |
 | 8 | [Orchestration with Airflow](docs/steps/STEP-08-airflow.md) | **done** |
-| 9 | Streaming with Kafka and Spark Structured Streaming | next |
-| 10 | Databricks, Snowflake, final numbers | |
+| 9 | [Streaming with Kafka and Spark Structured Streaming](docs/steps/STEP-09-streaming.md) | **done** |
+| 10 | Databricks, Snowflake, final numbers | next |
 
 How each step is learned and built: [docs/WORKFLOW.md](docs/WORKFLOW.md).
 

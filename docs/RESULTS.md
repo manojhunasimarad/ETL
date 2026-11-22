@@ -15,6 +15,7 @@ resume bullet; if a row is "pending", the bullet keeps its `XX`.
 | Batch runtime (silver + gold), baseline | 176.9 s | 201,874 orders | `benchmark --repeat 2` | GitHub runner, 4 cores, Spark 4.1.4 | 2026-11-22 |
 | Batch runtime (silver + gold), tuned | 33.0 s (5.4x faster): sized shuffle partitions + broadcast joins | 201,874 orders | `benchmark --repeat 2` | GitHub runner, 4 cores, Spark 4.1.4 | 2026-11-22 |
 | Postgres point lookup with FK index | 12.5 ms → 0.013 ms | 201,874 orders | `benchmark` | GitHub runner | 2026-11-22 |
+| Streaming: messages in, events out | 3,063 messages → 3,063 bronze, 32 quarantined, 2,968 silver; daily revenue equals the producer's total (414,831.77) | 3,000 synthetic order events with 63 duplicates, 34 late, 32 malformed | `produce --limit 3000` then `stream --reset` | GitHub runner, Kafka 4.1.2 | 2026-11-22 |
 
 Numbers above were measured on GitHub Actions runners by this repository's
 workflows. Re-run them on your own machine before an interview and add a
