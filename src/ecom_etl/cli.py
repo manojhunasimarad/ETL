@@ -11,6 +11,8 @@ Commands:
   silver          (step 3) bronze -> silver + quarantine (Spark)
   gold            (step 4) silver -> star schema (Spark)
   load-gold       (step 4) star schema -> Postgres <source>_gold (JDBC)
+  quality         (step 5) all data quality checks + report (+ history in Postgres)
+  run             (step 5) the whole batch pipeline with quality gates
 """
 
 from __future__ import annotations
@@ -227,6 +229,57 @@ def _cmd_silver(args: argparse.Namespace) -> int:
     return 0
 
 
+def _print_quality(report: dict) -> None:
+    s = report["summary"]
+    print(f"Data quality: {s['checks_total']} checks ({s['row_level_checks']} row-level, "
+          f"{s['table_level_checks']} table-level), {s['checks_failed']} flagged, "
+          f"{s['blocking_failures']} blocking")
+    print(f"  bronze records {s['bronze_records']:,}: quarantined {s['records_quarantined']:,}, "
+          f"duplicates removed {s['duplicates_removed']:,}, fixed {s['records_fixed']:,}, "
+          f"warnings {s['records_with_warnings']:,}")
+    ev = report.get("evaluation")
+    if ev:
+        q = ev["quarantine"]
+        print(f"  vs injected defects: quarantine precision {q['precision']:.1%}, recall {q['recall']:.1%}")
+    for c in report["checks"]:
+        if c["status"] == "fail" and c["kind"] == "table":
+            flag = "BLOCKING" if c["blocking"] else "warn"
+            print(f"  [{flag}] {c['name']}: {c['detail'] or c['failed_rows']}")
+    print(f"  report: {report['markdown_report']}")
+
+
+def _cmd_quality(args: argparse.Namespace) -> int:
+    from .contracts import TIMESTAMP_FORMAT
+    from .spark.pipeline import run_quality
+
+    spark, lake = _spark_and_lake(args.source)
+    directory = config.source_dir(args.source)
+    extracted_at = _source_extracted_at(directory).strftime(TIMESTAMP_FORMAT)
+    report = run_quality(spark, lake, _source_name(args.source), directory, extracted_at, save_dq=not args.no_db)
+    _print_quality(report)
+    return 1 if report["summary"]["blocking_failures"] else 0
+
+
+def _cmd_run(args: argparse.Namespace) -> int:
+    from .contracts import TIMESTAMP_FORMAT
+    from .spark.pipeline import run_pipeline
+    from .spark.quality import QualityGateError
+
+    spark, lake = _spark_and_lake(args.source, jdbc=not args.no_load)
+    directory = config.source_dir(args.source)
+    extracted_at = _source_extracted_at(directory).strftime(TIMESTAMP_FORMAT)
+    try:
+        report = run_pipeline(spark, directory, _source_name(args.source), lake, extracted_at,
+                              load=not args.no_load, save_dq=not args.no_load)
+    except QualityGateError as exc:
+        print(f"STOPPED: {exc}", file=sys.stderr)
+        return 2
+    print(f"Pipeline {report['status']} in {report['seconds']['total']}s: "
+          + ", ".join(f"{k} {v}s" for k, v in report["seconds"].items() if k != "total"))
+    _print_quality(report)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="ecom_etl", description="E-commerce batch and streaming ETL")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -278,6 +331,16 @@ def build_parser() -> argparse.ArgumentParser:
     lg = sub.add_parser("load-gold", help="step 4: load the star schema into Postgres <source>_gold")
     lg.add_argument("--source", default="synthetic", help="synthetic, olist, or a folder path")
     lg.set_defaults(func=_cmd_load_gold)
+
+    qa = sub.add_parser("quality", help="step 5: run all data quality checks on the current lake")
+    qa.add_argument("--source", default="synthetic", help="synthetic, olist, or a folder path")
+    qa.add_argument("--no-db", action="store_true", help="do not save results to Postgres")
+    qa.set_defaults(func=_cmd_quality)
+
+    rn = sub.add_parser("run", help="step 5: whole batch pipeline with quality gates")
+    rn.add_argument("--source", default="synthetic", help="synthetic, olist, or a folder path")
+    rn.add_argument("--no-load", action="store_true", help="stop after gold; do not touch Postgres")
+    rn.set_defaults(func=_cmd_run)
     return parser
 
 
