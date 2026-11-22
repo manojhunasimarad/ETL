@@ -7,6 +7,8 @@ Commands:
   profile         profile a source and write a markdown report
   load-raw        (step 2) copy the CSV files into Postgres <source>_raw
   build-core      (step 2) build the normalized <source>_core schema with SQL
+  bronze          (step 3) CSV -> bronze Parquet with lineage columns (Spark)
+  silver          (step 3) bronze -> silver + quarantine (Spark)
 """
 
 from __future__ import annotations
@@ -137,6 +139,60 @@ def _cmd_build_core(args: argparse.Namespace) -> int:
     return 0
 
 
+def _spark_and_lake(source: str):
+    from .spark.lake import Lake
+    from .spark.session import get_spark
+
+    return get_spark(f"ecom_etl-{_source_name(source)}"), Lake.for_source(_source_name(source))
+
+
+def _cmd_bronze(args: argparse.Namespace) -> int:
+    from .spark.bronze import run_bronze
+    from .spark.lake import new_run_id
+
+    spark, lake = _spark_and_lake(args.source)
+    run_id = new_run_id()
+    t0 = time.perf_counter()
+    counts = run_bronze(spark, config.source_dir(args.source), lake, run_id)
+    elapsed = time.perf_counter() - t0
+    lake.write_report(f"bronze_{run_id}", {"run_id": run_id, "seconds": round(elapsed, 2), "rows": counts})
+    print(f"Bronze written to {lake.root / 'bronze'} in {elapsed:.1f}s")
+    for table, rows in counts.items():
+        print(f"  {table:<22}{rows:>12,} rows")
+    return 0
+
+
+def _cmd_silver(args: argparse.Namespace) -> int:
+    from dataclasses import asdict
+
+    from .contracts import TIMESTAMP_FORMAT
+    from .spark.lake import new_run_id
+    from .spark.silver import run_silver
+
+    spark, lake = _spark_and_lake(args.source)
+    extracted_at = _source_extracted_at(config.source_dir(args.source)).strftime(TIMESTAMP_FORMAT)
+    run_id = new_run_id()
+    t0 = time.perf_counter()
+    reports = run_silver(spark, lake, extracted_at)
+    elapsed = time.perf_counter() - t0
+    lake.write_report(f"silver_{run_id}", {"run_id": run_id, "seconds": round(elapsed, 2),
+                                            "extracted_at": extracted_at,
+                                            "tables": {k: asdict(v) for k, v in reports.items()}})
+    print(f"Silver written to {lake.root / 'silver'} in {elapsed:.1f}s")
+    print(f"  {'table':<22}{'bronze':>10}{'dupes':>8}{'quarantine':>12}{'silver':>10}")
+    for name, r in reports.items():
+        print(f"  {name:<22}{r.bronze_rows:>10,}{r.exact_duplicates:>8,}{r.quarantined:>12,}{r.silver_rows:>10,}")
+    reasons = {}
+    for r in reports.values():
+        for code, n in r.reasons.items():
+            reasons[f"{r.table}: {code}"] = n
+    if reasons:
+        print("\n  quarantine reasons:")
+        for code, n in sorted(reasons.items(), key=lambda kv: -kv[1]):
+            print(f"    {code:<60}{n:>8,}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="ecom_etl", description="E-commerce batch and streaming ETL")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -172,6 +228,14 @@ def build_parser() -> argparse.ArgumentParser:
     bc = sub.add_parser("build-core", help="step 2: build the normalized <source>_core schema with SQL")
     bc.add_argument("--source", default="synthetic", help="synthetic, olist, or a folder path")
     bc.set_defaults(func=_cmd_build_core)
+
+    br = sub.add_parser("bronze", help="step 3: CSV -> bronze Parquet (Spark)")
+    br.add_argument("--source", default="synthetic", help="synthetic, olist, or a folder path")
+    br.set_defaults(func=_cmd_bronze)
+
+    sv = sub.add_parser("silver", help="step 3: bronze -> silver + quarantine (Spark)")
+    sv.add_argument("--source", default="synthetic", help="synthetic, olist, or a folder path")
+    sv.set_defaults(func=_cmd_silver)
     return parser
 
 

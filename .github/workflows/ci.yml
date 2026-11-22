@@ -22,14 +22,18 @@ jobs:
     env:
       ECOM_DB_HOST: localhost
       # services listed here must be available, otherwise the run fails
-      ECOM_REQUIRE_INFRA: postgres
+      ECOM_REQUIRE_INFRA: postgres,spark
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
+      - name: Use Java 17 (preinstalled on the runner)
+        run: |
+          echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+          "$JAVA_HOME_17_X64/bin/java" -version
       - name: Install
-        run: pip install -e ".[dev,postgres]"
+        run: pip install -e ".[dev,postgres,spark]"
       - name: Tests (unit + integration)
         run: pytest -q -rs
       - name: Smoke run
@@ -38,6 +42,8 @@ jobs:
           python -m ecom_etl profile --source synthetic
           python -m ecom_etl load-raw --source synthetic
           python -m ecom_etl build-core --source synthetic
+          python -m ecom_etl bronze --source synthetic
+          python -m ecom_etl silver --source synthetic
 
   compose:
     runs-on: ubuntu-latest
@@ -47,3 +53,12 @@ jobs:
         run: docker compose --profile tools config --quiet
       - name: Pull images
         run: docker compose --profile tools pull --quiet
+      - name: Build the pipeline image
+        run: docker compose --profile pipeline build pipeline
+      - name: Run the pipeline in Docker
+        run: |
+          mkdir -p data reports
+          docker compose up -d postgres
+          docker compose run --rm pipeline generate --orders 2000
+          docker compose run --rm pipeline bronze --source synthetic
+          docker compose run --rm pipeline silver --source synthetic

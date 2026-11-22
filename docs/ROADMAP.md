@@ -14,7 +14,7 @@ against a campus-hire Data Engineer job description (see the mapping below).
 | # | Step | What gets built | Zoomcamp module | Status |
 |---|---|---|---|---|
 | 1 | Data sources and profiling | Source contract, synthetic Olist-shaped generator with ground-truth defects, Kaggle Olist download, profiler | Prep for 01 | **done** |
-| 2 | Postgres landing zone and normalization | `docker-compose` with Postgres + pgAdmin, chunked raw loader, normalized `raw` schema with keys and constraints, 1NF to 3NF | 01-docker-terraform | **done** |
+| 2 | Postgres landing zone and normalization | `docker-compose` with Postgres + pgAdmin, chunked raw loader, normalized `core` schema with keys and constraints, 1NF to 3NF | 01-docker-terraform | **done** |
 | 3 | Batch with PySpark: bronze to silver | Explicit Spark schemas, typing and cleaning, dedupe, partitioned Parquet lake | 06-batch | next |
 | 4 | Dimensional model (gold) | `fact_order_line` (grain: one row per order line), `fact_payment`, `dim_customer` as **SCD Type 2**, `dim_product`, `dim_seller`, `dim_date`; surrogate keys; load to Postgres | 03-data-warehouse, 04-analytics-engineering | |
 | 5 | Data quality framework | Checks for nulls, duplicates, referential integrity, freshness, accepted values, ranges; quarantine tables; run report; precision and recall against `_defects.csv` | 04 (tests), 05-data-platforms | |

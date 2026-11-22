@@ -20,6 +20,24 @@ services:
       timeout: 5s
       retries: 20
 
+  # Runs any pipeline command with Java + Spark preinstalled, e.g.
+  #   docker compose run --rm pipeline bronze --source synthetic
+  pipeline:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: ecom-etl/pipeline:latest
+    profiles: ["pipeline"]
+    environment:
+      ECOM_DB_HOST: postgres
+    volumes:
+      - ./data:/app/data
+      - ./reports:/app/reports
+      - ./src:/app/src          # code changes apply without rebuilding
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   pgadmin:
     image: dpage/pgadmin4:9
     profiles: ["tools"]
