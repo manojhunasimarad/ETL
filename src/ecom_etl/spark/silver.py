@@ -87,10 +87,16 @@ def typed_column(name: str, dtype: str):
 
 
 def standardize(df, table: Table):
-    """Apply the fix rules; record which fixes happened in ``_fixes``."""
+    """Apply the fix rules; record which fixes happened in ``_fixes``.
+
+    Everything is computed in one ``select`` so that the fix detection sees
+    the *original* values. (Replacing columns one by one with
+    ``withColumn`` and detecting afterwards would compare cleaned values
+    with cleaned values and never find a fix.)
+    """
     from pyspark.sql import functions as F
 
-    fixes = []
+    fixes, cleaned = [], {}
     for col in table.columns:
         raw = F.col(col.name)
         clean = F.trim(raw)
@@ -109,9 +115,11 @@ def standardize(df, table: Table):
             clean = F.lower(clean)
         if col.name in UPPER_COLUMNS:
             clean = F.upper(clean)
-        df = df.withColumn(col.name, clean)
-    return df.withColumn("_fixes", F.array_compact(F.array(*fixes)) if fixes
-                         else F.array().cast("array<string>"))
+        cleaned[col.name] = clean
+    fixes_column = F.array_compact(F.array(*fixes)) if fixes else F.array().cast("array<string>")
+    others = [c for c in df.columns if c not in cleaned]
+    return df.select(*[cleaned[c].alias(c) for c in table.column_names], *others,
+                     fixes_column.alias("_fixes"))
 
 
 def contract_reasons(table: Table) -> list:
