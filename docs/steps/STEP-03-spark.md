@@ -121,7 +121,19 @@ python -m ecom_etl silver --source synthetic
 ```
 
 `silver` prints rows per table (bronze, duplicates, quarantine, silver)
-and the quarantine reasons. Reports are saved in `data/lake/<source>/_reports/`.
+and the quarantine reasons. For 5,000 synthetic orders (CI run):
+
+```
+  table                     bronze   dupes  quarantine    silver
+  customers                  5,062      62           0     5,000
+  orders                     5,061      61         195     4,805
+  order_items                5,656       0         323     5,333
+  order_payments             5,286      59         313     4,914
+```
+
+The silver counts are identical to the `core` counts of the SQL path in
+step 2 (4,805 / 5,333 / 4,914): two independent implementations of the
+same rules agree. Reports are saved in `data/lake/<source>/_reports/`.
 
 Look at the data with PySpark:
 

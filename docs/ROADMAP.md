@@ -15,8 +15,8 @@ against a campus-hire Data Engineer job description (see the mapping below).
 |---|---|---|---|---|
 | 1 | Data sources and profiling | Source contract, synthetic Olist-shaped generator with ground-truth defects, Kaggle Olist download, profiler | Prep for 01 | **done** |
 | 2 | Postgres landing zone and normalization | `docker-compose` with Postgres + pgAdmin, chunked raw loader, normalized `core` schema with keys and constraints, 1NF to 3NF | 01-docker-terraform | **done** |
-| 3 | Batch with PySpark: bronze to silver | Explicit Spark schemas, typing and cleaning, dedupe, partitioned Parquet lake | 06-batch | next |
-| 4 | Dimensional model (gold) | `fact_order_line` (grain: one row per order line), `fact_payment`, `dim_customer` as **SCD Type 2**, `dim_product`, `dim_seller`, `dim_date`; surrogate keys; load to Postgres | 03-data-warehouse, 04-analytics-engineering | |
+| 3 | Batch with PySpark: bronze to silver | Explicit Spark schemas, typing and cleaning, dedupe, partitioned Parquet lake | 06-batch | **done** |
+| 4 | Dimensional model (gold) | `fact_order_line` (grain: one row per order line), `fact_payment`, `dim_customer` as **SCD Type 2**, `dim_product`, `dim_seller`, `dim_date`; surrogate keys; load to Postgres | 03-data-warehouse, 04-analytics-engineering | next |
 | 5 | Data quality framework | Checks for nulls, duplicates, referential integrity, freshness, accepted values, ranges; quarantine tables; run report; precision and recall against `_defects.csv` | 04 (tests), 05-data-platforms | |
 | 6 | SQL analysis and dashboard | 10 business questions in SQL (CTEs, window functions); Metabase dashboard on the star schema | 03, 04 | |
 | 7 | Performance tuning | Spark: partitioning, broadcast joins, AQE, skew, file sizing. SQL: indexes, `EXPLAIN ANALYZE`. Baseline vs tuned timings recorded | 03 (partitioning), 06 (join internals) | |
@@ -110,8 +110,8 @@ Each step note lists exact chapters and videos; this is the plan.
 |---|---|---|---|
 | 1 | *Fundamentals of Data Engineering* ch. 2, 5 | Data Engineering Foundations; Data Science Foundations: Data Engineering | |
 | 2 | *Fundamentals of Data Engineering* ch. 6, 7, and the data modeling part of ch. 8 (normalization) | | **done** |
-| 3 | *Learning Spark, 2nd Ed.* ch. 1-4 | Apache Spark Essential Training: Big Data Engineering | next |
-| 4 | *The Data Warehouse Toolkit, 3rd Ed.* ch. 1-3, and ch. 5 for slowly changing dimensions | Introduction to Data Warehouses | Zoomcamp modules 03, 04 |
+| 3 | *Learning Spark, 2nd Ed.* ch. 1-4 | Apache Spark Essential Training: Big Data Engineering | **done** |
+| 4 | *The Data Warehouse Toolkit, 3rd Ed.* ch. 1-3, and ch. 5 for slowly changing dimensions | Introduction to Data Warehouses | next |
 | 5 | *Data Quality Fundamentals* ch. 1-4 | | Zoomcamp module 04 (dbt tests) |
 | 6 | *SQL for Data Analysis* (Tanimura) | | Metabase docs |
 | 7 | *Learning Spark* ch. 7; *High Performance Spark* | | Zoomcamp module 06 (join internals) |
