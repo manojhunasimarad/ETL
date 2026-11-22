@@ -2,6 +2,7 @@
 #   docker compose up -d postgres            # step 2+
 #   docker compose --profile tools up -d     # + pgAdmin on http://localhost:5050
 #   docker compose --profile dashboard up -d # + Streamlit dashboard on http://localhost:8501
+#   docker compose --profile airflow up -d   # + Airflow on http://localhost:8080
 name: ecom-etl
 
 services:
@@ -55,6 +56,35 @@ services:
     volumes:
       - ./dashboard:/app/dashboard
       - ./src:/app/src
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Airflow 3 (UI on http://localhost:8080, no login in local mode)
+  #   docker compose --profile airflow up -d airflow
+  # On Linux, set AIRFLOW_UID=$(id -u) in .env so files in ./data stay yours.
+  airflow:
+    build:
+      context: .
+      dockerfile: docker/airflow.Dockerfile
+    image: ecom-etl/airflow:latest
+    profiles: ["airflow"]
+    user: "${AIRFLOW_UID:-50000}:0"
+    command: ["bash", "/opt/airflow/start.sh"]
+    environment:
+      ECOM_DB_HOST: postgres
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${ECOM_DB_USER:-ecom}:${ECOM_DB_PASSWORD:-ecom}@postgres:5432/airflow
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./docker/airflow-start.sh:/opt/airflow/start.sh:ro
+      - ./data:/opt/ecom/data
+      - ./reports:/opt/ecom/reports
+      - ./src:/opt/ecom/src
     depends_on:
       postgres:
         condition: service_healthy

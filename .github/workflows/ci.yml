@@ -52,6 +52,47 @@ jobs:
           cat reports/dq_report_synthetic.md
           python -m ecom_etl analyze --source synthetic
 
+  airflow:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ecom
+          POSTGRES_PASSWORD: ecom
+          POSTGRES_DB: ecom
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ecom -d ecom"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      ECOM_DB_HOST: localhost
+      AIRFLOW_VERSION: "3.1.7"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Use Java 17
+        run: echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+      - name: Install Airflow (with its constraints) and the project
+        run: |
+          pip install "apache-airflow==${AIRFLOW_VERSION}" \
+            --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-3.11.txt"
+          pip install "apache-airflow==${AIRFLOW_VERSION}" -e ".[dev,postgres,spark]"
+      - name: DAG structure tests
+        run: pytest -q tests/test_airflow_dag.py
+      - name: Run the whole DAG once (airflow dags test)
+        env:
+          ECOM_HOME: ${{ github.workspace }}
+          AIRFLOW__CORE__DAGS_FOLDER: ${{ github.workspace }}/airflow/dags
+          AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+        run: |
+          airflow db migrate
+          airflow dags test ecom_batch_pipeline --conf '{"source": "synthetic", "orders": 3000}'
+          ls reports/
+
   compose:
     runs-on: ubuntu-latest
     steps:
@@ -72,6 +113,14 @@ jobs:
           docker compose run --rm pipeline gold --source synthetic
           docker compose run --rm pipeline load-gold --source synthetic
           docker compose run --rm pipeline run --source synthetic
+      - name: Airflow starts in Docker
+        run: |
+          sudo chmod -R 777 data reports
+          docker compose --profile airflow build airflow
+          docker compose --profile airflow up -d airflow
+          for i in $(seq 1 60); do curl -fs http://localhost:8080/api/v2/monitor/health && break; sleep 5; done
+          curl -fs http://localhost:8080/api/v2/monitor/health
+          docker compose --profile airflow exec -T airflow airflow dags list
       - name: Dashboard serves in Docker
         run: |
           docker compose --profile dashboard up -d dashboard

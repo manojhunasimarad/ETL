@@ -251,7 +251,8 @@ def _cmd_quality(args: argparse.Namespace) -> int:
     spark, lake = _spark_and_lake(args.source)
     directory = config.source_dir(args.source)
     extracted_at = _source_extracted_at(directory).strftime(TIMESTAMP_FORMAT)
-    report = run_quality(spark, lake, _source_name(args.source), directory, extracted_at, save_dq=not args.no_db)
+    report = run_quality(spark, lake, _source_name(args.source), directory, extracted_at, save_dq=not args.no_db,
+                         include_gold=args.layer != "silver")
     _print_quality(report)
     return 1 if report["summary"]["blocking_failures"] else 0
 
@@ -378,6 +379,8 @@ def build_parser() -> argparse.ArgumentParser:
     qa = sub.add_parser("quality", help="step 5: run all data quality checks on the current lake")
     qa.add_argument("--source", default="synthetic", help="synthetic, olist, or a folder path")
     qa.add_argument("--no-db", action="store_true", help="do not save results to Postgres")
+    qa.add_argument("--layer", choices=("silver", "gold"), default="gold",
+                    help="silver: silver gates only (before gold is built); gold: everything (default)")
     qa.set_defaults(func=_cmd_quality)
 
     rn = sub.add_parser("run", help="step 5: whole batch pipeline with quality gates")
