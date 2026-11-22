@@ -9,7 +9,7 @@ Built on two datasets with the same schema:
 - **Olist**: the real Brazilian e-commerce dataset from Kaggle (about 100k orders, real data quality problems).
 - **Synthetic**: an Olist-shaped generator that scales to millions of rows and records every defect it injects, so the quality checks can be measured against ground truth.
 
-Stack (when complete): Python, PySpark, SQL, Postgres, Airflow, Kafka (Redpanda), Docker.
+Stack (when complete): Python, PySpark, SQL, Postgres, Metabase, Airflow, Kafka (Redpanda), Docker, Databricks, Snowflake.
 
 ## Status
 
@@ -20,14 +20,17 @@ See the [roadmap](docs/ROADMAP.md).
 | Step | Topic | Status |
 |---|---|---|
 | 1 | [Data sources and profiling](docs/steps/STEP-01-data-sources.md) | done |
-| 2 | Docker and Postgres landing zone | next |
+| 2 | Postgres landing zone and normalization | next |
 | 3 | Batch with PySpark: bronze to silver | |
-| 4 | Star schema (gold) | |
+| 4 | Dimensional model (star schema, SCD Type 2) | |
 | 5 | Data quality framework | |
-| 6 | Orchestration with Airflow | |
-| 7 | Streaming with Kafka and Spark Structured Streaming | |
-| 8 | Performance tuning | |
-| 9 | CI, docs, final numbers | |
+| 6 | SQL analysis and dashboard | |
+| 7 | Performance tuning (Spark and SQL) | |
+| 8 | Orchestration with Airflow | |
+| 9 | Streaming with Kafka and Spark Structured Streaming | |
+| 10 | Databricks, Snowflake, final numbers | |
+
+How each step is learned and built: [docs/WORKFLOW.md](docs/WORKFLOW.md).
 
 ## Quickstart (step 1)
 
@@ -56,8 +59,10 @@ src/ecom_etl/
   cli.py          python -m ecom_etl <command>
 tests/            pytest suite
 docs/
-  ROADMAP.md      the 9 steps, architecture, learning material
+  ROADMAP.md      the 10 steps, architecture, learning material
+  WORKFLOW.md     how each step is learned, built and merged
   RESULTS.md      measured numbers only
+  STORIES.md      interview stories, one per step
   steps/          one study note per step
   samples/        example outputs
 ```

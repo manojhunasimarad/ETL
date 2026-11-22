@@ -3,7 +3,7 @@
 Why a generator when real Olist data exists?
 
 * Volume: Olist has ~112k order lines. To see what partitioning and
-  broadcast joins actually buy you in Spark (step 8) you need millions.
+  broadcast joins actually buy you in Spark (step 7) you need millions.
 * Ground truth: the generator records every defect it injects in
   ``_defects.csv``. That turns the data-quality checks (step 5) into
   something you can *measure*: did the checks find all injected defects,

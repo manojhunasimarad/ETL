@@ -24,9 +24,9 @@ us as CSV exports.
 |---|---|
 | Generation | Olist exports (real) and `generator.py` (synthetic), **step 1** |
 | Storage | Postgres (step 2), Parquet data lake (step 3) |
-| Ingestion | raw loader (step 2), Spark batch (step 3), Kafka streaming (step 7) |
+| Ingestion | raw loader (step 2), Spark batch (step 3), Kafka streaming (step 9) |
 | Transformation | bronze to silver to gold with PySpark (steps 3-4), quality gates (step 5) |
-| Serving | star schema in Postgres for SQL analytics (step 4) |
+| Serving | star schema in Postgres (step 4), SQL analysis and dashboard (step 6) |
 
 ### 1.2 OLTP source, OLAP target
 
@@ -136,7 +136,7 @@ events with `event_time=True`. This is also the basis of the
 The synthetic generator exists for three reasons:
 
 1. **Volume**: real Olist has about 112k order lines; Spark tuning
-   (step 8) needs millions to show anything.
+   (step 7) needs millions to show anything.
 2. **Ground truth**: every injected defect is written to `_defects.csv`.
    That lets us measure the quality checks like a classifier: did they
    catch every bad row (recall) and only bad rows (precision)?
@@ -230,7 +230,7 @@ A sample report from the default synthetic run is in
    **dedupe**, **quarantine**, or **accept** (legitimate). Write one line
    of reasoning for each.
 5. Time a bigger run: `python -m ecom_etl generate --orders 1000000`.
-   Note the time and the folder size. We will need both in step 8.
+   Note the time and the folder size. We will need both in step 7.
 
 ## 5. Check yourself (interview-style)
 

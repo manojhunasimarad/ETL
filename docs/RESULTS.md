@@ -11,5 +11,5 @@ resume bullet; if a row is "pending", the bullet keeps its `XX`.
 | Number of automated data quality checks | pending (step 5) | | | | |
 | Bad records flagged per run, Olist | pending (step 5) | Olist | | | |
 | Bad records flagged per run, synthetic | pending (step 5) | synthetic | | | |
-| Batch runtime, baseline | pending (step 8) | | | | |
-| Batch runtime, tuned | pending (step 8) | | | | |
+| Batch runtime, baseline | pending (step 7) | | | | |
+| Batch runtime, tuned | pending (step 7) | | | | |
