@@ -121,7 +121,8 @@ jobs:
           for i in $(seq 1 60); do curl -fs http://localhost:8080/api/v2/monitor/health && break; sleep 5; done
           if ! curl -fs http://localhost:8080/api/v2/monitor/health; then
             docker compose --profile airflow ps -a
-            docker compose --profile airflow logs airflow | tail -150
+            docker compose --profile airflow logs airflow | head -80
+            docker compose --profile airflow logs airflow | tail -80
             exit 1
           fi
           docker compose --profile airflow exec -T airflow airflow dags list

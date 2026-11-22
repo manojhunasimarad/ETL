@@ -77,6 +77,9 @@ services:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"
+      # the image's entrypoint waits for the metadata DB before running any
+      # command; skip that so start.sh can create the "airflow" database first
+      CONNECTION_CHECK_MAX_COUNT: "0"
     ports:
       - "8080:8080"
     volumes:
