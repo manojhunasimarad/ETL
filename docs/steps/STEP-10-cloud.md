@@ -140,6 +140,12 @@ run in a Snowsight worksheet. Queries to try once loaded:
 | the export: every column, row counts, microsecond timestamps | that Snowflake accepts the files |
 | every SQL statement and the load order, against a fake connection | that Snowflake accepts the statements and the counts match |
 
+In CI on 2026-11-22 (4-core runner, Spark 4.1.4), `run_batch` on 20,000 orders with
+caching off took 70.6 s and produced the same 91,521 bronze records and the same
+gold row counts as the cached `run` (68.9 s without its Postgres load). At this
+size caching is worth almost nothing; the deterministic duplicate removal is
+what made the uncached run safe.
+
 Until you have run the right-hand column, say so: "written for Databricks and
 Snowflake and tested locally" is true; "deployed on Snowflake" is not yet.
 
