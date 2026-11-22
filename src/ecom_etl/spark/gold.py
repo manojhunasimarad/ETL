@@ -27,6 +27,7 @@ from __future__ import annotations
 
 from typing import Dict
 
+from .compat import persist, unpersist
 from .lake import Lake
 from .silver import read_layer
 
@@ -247,13 +248,13 @@ def run_gold(spark, lake: Lake, broadcast_dims: bool = True, partition_facts: bo
         df.write.mode("overwrite").parquet(lake.path("gold", name))
     dims = {name: spark.read.parquet(lake.path("gold", name)) for name in dims}
 
-    order_keys = build_order_keys(silver["orders"], silver["customers"], dims["dim_customer"], bc).persist()
+    order_keys = persist(build_order_keys(silver["orders"], silver["customers"], dims["dim_customer"], bc))
     fact = build_fact_order_line(silver["order_items"], order_keys, dims["dim_product"], dims["dim_seller"], bc)
     writer = fact.write.mode("overwrite")
     (writer.partitionBy("order_month") if partition_facts else writer).parquet(lake.path("gold", "fact_order_line"))
     build_fact_payment(silver["order_payments"], order_keys).write.mode("overwrite").parquet(
         lake.path("gold", "fact_payment"))
-    order_keys.unpersist()
+    unpersist(order_keys)
 
     fact = spark.read.parquet(lake.path("gold", "fact_order_line"))
     build_agg_daily_sales(fact).write.mode("overwrite").parquet(lake.path("gold", "agg_daily_sales"))

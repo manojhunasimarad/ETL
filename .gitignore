@@ -29,3 +29,8 @@ logs/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Snowflake key-pair files, local Spark tables
+*.p8
+spark-warehouse/
+metastore_db/

@@ -18,6 +18,7 @@ postgres = ["psycopg[binary]>=3.1"]
 spark = ["pyspark>=4.0,<4.2"]
 dashboard = ["streamlit>=1.36"]
 streaming = ["confluent-kafka>=2.3"]
+snowflake = ["snowflake-connector-python>=3.6"]
 
 [project.scripts]
 ecom-etl = "ecom_etl.cli:main"

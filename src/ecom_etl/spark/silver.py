@@ -39,6 +39,7 @@ from ..contracts import (
     Table,
 )
 from .bronze import LINEAGE_COLUMNS
+from .compat import persist, unpersist
 from .lake import Lake, new_run_id
 
 SPARK_TS_PATTERN = "yyyy-MM-dd HH:mm:ss"
@@ -214,7 +215,7 @@ def _tally(df, column: str) -> Dict[str, int]:
 
 
 def validate_table(spark, lake: Lake, table: Table, extracted_at: str, extra_fixes=None):
-    """Return (checked DataFrame with _reasons/_warnings, report). The DataFrame is persisted."""
+    """Return (checked DataFrame with _reasons/_warnings, report). The DataFrame is persisted where caching is on."""
     from pyspark.sql import Window
     from pyspark.sql import functions as F
 
@@ -225,7 +226,12 @@ def validate_table(spark, lake: Lake, table: Table, extracted_at: str, extra_fix
     std = standardize(bronze, table)
     if extra_fixes is not None:  # (column expression giving a fix label or NULL, joined DataFrame)
         std = extra_fixes(std)
-    deduped = std.dropDuplicates(table.column_names).persist()
+    # Exact duplicates: keep the first copy loaded. Choosing it by _row_id (not dropDuplicates,
+    # which keeps an arbitrary copy) makes the result the same however often it is recomputed,
+    # which matters where caching is off (ECOM_NO_CACHE, Databricks serverless).
+    first_copy = Window.partitionBy(*table.column_names).orderBy("_row_id")
+    deduped = persist(std.withColumn("__copy", F.row_number().over(first_copy))
+                      .filter(F.col("__copy") == 1).drop("__copy"))
     report.exact_duplicates = report.bronze_rows - deduped.count()
 
     df = deduped.select("*", *[typed_column(c.name, c.dtype).alias(f"__t_{c.name}") for c in table.columns])
@@ -243,11 +249,10 @@ def validate_table(spark, lake: Lake, table: Table, extracted_at: str, extra_fix
     df, fk_reasons = foreign_key_checks(spark, lake, table, df)
     reasons += fk_reasons
 
-    checked = (df.withColumn("_reasons", F.array_compact(F.array(*reasons)))
-                 .withColumn("_warnings", F.array_compact(F.array(*warnings)) if warnings
-                             else F.array().cast("array<string>"))
-                 .persist())
-    deduped.unpersist()
+    checked = persist(df.withColumn("_reasons", F.array_compact(F.array(*reasons)))
+                        .withColumn("_warnings", F.array_compact(F.array(*warnings)) if warnings
+                                    else F.array().cast("array<string>")))
+    unpersist(deduped)
     return checked, report
 
 
@@ -274,7 +279,7 @@ def split_and_write(lake: Lake, table: Table, checked, report: TableReport, extr
     report.reasons = _tally(bad, "_reasons")
     report.fixes = _tally(good, "_fixes")
     report.warnings = _tally(good, "_warnings")
-    checked.unpersist()
+    unpersist(checked)
 
 
 def run_silver(spark, lake: Lake, extracted_at: str, run_id: Optional[str] = None) -> Dict[str, TableReport]:
@@ -303,7 +308,7 @@ def run_silver(spark, lake: Lake, extracted_at: str, run_id: Optional[str] = Non
     used = (read_layer(spark, lake, "bronze", "products")
             .select(F.trim("product_category_name").alias("c"))
             .filter(F.col("c").isNotNull() & (F.col("c") != "")).distinct())
-    missing = used.join(translations, "c", "left_anti").persist()
+    missing = persist(used.join(translations, "c", "left_anti"))
 
     def add_missing_categories(silver):
         added = missing.select(
@@ -328,7 +333,7 @@ def run_silver(spark, lake: Lake, extracted_at: str, run_id: Optional[str] = Non
         return joined.withColumn("_fixes", F.array_compact(F.concat("_fixes", F.array(tag)))).drop("__missing_cat")
 
     process("products", extra_fixes=tag_untranslated)
-    missing.unpersist()
+    unpersist(missing)
 
     for name in ("orders", "order_items", "order_payments"):
         process(name)

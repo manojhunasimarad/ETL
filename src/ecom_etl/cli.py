@@ -363,6 +363,46 @@ def _cmd_stream(args: argparse.Namespace) -> int:
     return 0
 
 
+def _snowflake_target(args: argparse.Namespace):
+    from .snowflake import Target
+
+    return Target(database=args.database, schema=args.schema, warehouse=args.warehouse)
+
+
+def _cmd_export_snowflake(args: argparse.Namespace) -> int:
+    from .snowflake import script
+    from .spark.export import export_dir, export_for_snowflake
+
+    spark, lake = _spark_and_lake(args.source)
+    t0 = time.perf_counter()
+    manifest = export_for_snowflake(spark, lake)
+    out = config.REPORTS_DIR / f"snowflake_{_source_name(args.source)}.sql"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(script(manifest, _snowflake_target(args)), encoding="utf-8")
+    print(f"Exported gold for Snowflake to {export_dir(lake)} in {time.perf_counter() - t0:.1f}s")
+    for table, info in manifest.items():
+        print(f"  {table:<22}{info['rows']:>12,} rows  {len(info['columns'])} columns")
+    print(f"SQL script: {out}  (run it with SnowSQL or `snow sql -f`, or use load-snowflake)")
+    return 0
+
+
+def _cmd_load_snowflake(args: argparse.Namespace) -> int:
+    from .snowflake import connect_from_env, load
+    from .spark.export import export_dir, read_manifest
+    from .spark.lake import Lake
+
+    lake = Lake.for_source(_source_name(args.source))
+    manifest = read_manifest(export_dir(lake))
+    target = _snowflake_target(args)
+    t0 = time.perf_counter()
+    with connect_from_env() as conn:
+        results = load(conn, manifest, target)
+    print(f"Loaded gold into Snowflake {target.qualified} in {time.perf_counter() - t0:.1f}s")
+    for table, r in results.items():
+        print(f"  {table:<22}{r['loaded']:>12,} rows  {'ok' if r['ok'] else 'EXPECTED ' + format(r['expected'], ',')}")
+    return 0 if all(r["ok"] for r in results.values()) else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="ecom_etl", description="E-commerce batch and streaming ETL")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -456,6 +496,15 @@ def build_parser() -> argparse.ArgumentParser:
     st.add_argument("--max-offsets", type=int, help="max messages per micro-batch (default: all available)")
     st.add_argument("--reset", action="store_true", help="delete checkpoints and outputs, start from the beginning")
     st.set_defaults(func=_cmd_stream)
+
+    for name, helptext in (("export-snowflake", "step 10: write gold for Snowflake (Parquet + SQL script)"),
+                           ("load-snowflake", "step 10: load the export into Snowflake (needs credentials)")):
+        sf = sub.add_parser(name, help=helptext)
+        sf.add_argument("--source", default="synthetic", help="synthetic, olist, or a folder path")
+        sf.add_argument("--database", default="ECOM")
+        sf.add_argument("--schema", default="GOLD")
+        sf.add_argument("--warehouse", default="ECOM_WH")
+        sf.set_defaults(func=_cmd_export_snowflake if name == "export-snowflake" else _cmd_load_snowflake)
     return parser
 
 

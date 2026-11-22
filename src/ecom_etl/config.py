@@ -1,7 +1,8 @@
 """Project paths. Everything is relative to the repository root, so the
 same commands work on Windows, WSL, Linux and inside Docker.
 
-Set ECOM_ETL_DATA_DIR to keep large data outside the repo.
+Set ECOM_ETL_DATA_DIR to keep large data outside the repo, and
+ECOM_ETL_REPORTS_DIR to write reports elsewhere (the Databricks notebook does).
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = Path(os.environ.get("ECOM_ETL_DATA_DIR", PROJECT_ROOT / "data"))
 RAW_DIR = DATA_DIR / "raw"
-REPORTS_DIR = PROJECT_ROOT / "reports"
+REPORTS_DIR = Path(os.environ.get("ECOM_ETL_REPORTS_DIR", PROJECT_ROOT / "reports"))
 
 KNOWN_SOURCES = ("synthetic", "olist")
 

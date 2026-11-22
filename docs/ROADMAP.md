@@ -22,7 +22,7 @@ against a campus-hire Data Engineer job description (see the mapping below).
 | 7 | Performance tuning | Spark: partitioning, broadcast joins, AQE, skew, file sizing. SQL: indexes, `EXPLAIN ANALYZE`. Baseline vs tuned timings recorded | 03 (partitioning), 06 (join internals) | **done** |
 | 8 | Orchestration with Airflow | Airflow in Docker, DAG for the batch pipeline, retries, backfills, idempotent reruns | 02-workflow-orchestration (Zoomcamp uses Kestra; we use Airflow) | **done** |
 | 9 | Streaming | Kafka (KRaft), order event producer with injected duplicates, late and malformed messages, Spark Structured Streaming with schema, watermark, dedupe and windowed metrics | 07-streaming | **done** |
-| 10 | Cloud platforms and wrap-up | Same Spark job on Databricks Free Edition; gold tables in a Snowflake trial; full CI; final numbers | Final project | next |
+| 10 | Cloud platforms and wrap-up | Same Spark job on Databricks Free Edition; gold tables in a Snowflake trial; full CI; final numbers | Final project | **done** (cloud runs pending) |
 
 Steps 1 to 7 cover the job description's required skills and duties.
 Steps 8 to 10 cover its *preferred* qualifications; if time is short,

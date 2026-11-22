@@ -1,0 +1,180 @@
+"""Step 10: load the gold star schema into Snowflake.
+
+The export (``spark/export.py``) leaves one folder of Parquet files per gold
+table and a manifest with each table's columns and row count. This module turns
+that into Snowflake SQL and runs it:
+
+1. create a warehouse that suspends itself after 60 s, a database, a schema, a
+   Parquet file format and an internal stage (all ``IF NOT EXISTS``);
+2. per table: ``CREATE OR REPLACE TABLE`` from the Spark schema, clear the
+   table's folder on the stage, ``PUT`` the files, ``COPY INTO`` the table
+   matching Parquet columns by name;
+3. compare ``COUNT(*)`` in Snowflake with the row count Spark wrote.
+
+Replacing the table and clearing its stage folder makes a rerun give the same
+tables, the same way every other load in this project is idempotent.
+
+Nothing here needs Spark or Snowflake to be tested: the SQL is built by plain
+functions, and :func:`load` takes any DB-API connection. The command
+``python -m ecom_etl load-snowflake`` uses snowflake-connector-python
+(``pip install -e ".[snowflake]"``); ``export-snowflake`` also writes the whole
+script to a file you can run with SnowSQL or the Snowflake CLI.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, Iterable, List, Sequence, Tuple
+
+SPARK_TO_SNOWFLAKE = {
+    "string": "VARCHAR",
+    "tinyint": "INTEGER", "smallint": "INTEGER", "int": "INTEGER", "bigint": "INTEGER",
+    "float": "FLOAT", "double": "FLOAT",
+    "boolean": "BOOLEAN",
+    "date": "DATE",
+    "timestamp": "TIMESTAMP_NTZ",       # the pipeline's session time zone is UTC
+    "timestamp_ntz": "TIMESTAMP_NTZ",
+    "binary": "BINARY",
+}
+_IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_$]*")
+
+
+def snowflake_type(spark_type: str) -> str:
+    """Snowflake column type for a Spark type string such as ``decimal(12,2)``."""
+    t = spark_type.strip().lower()
+    m = re.fullmatch(r"decimal\((\d+),\s*(\d+)\)", t)
+    if m:
+        return f"NUMBER({m.group(1)},{m.group(2)})"
+    if t.startswith("array<"):
+        return "ARRAY"
+    if t.startswith(("struct<", "map<")):
+        return "VARIANT"
+    if t not in SPARK_TO_SNOWFLAKE:
+        raise ValueError(f"no Snowflake type for Spark type {spark_type!r}")
+    return SPARK_TO_SNOWFLAKE[t]
+
+
+def ident(name: str) -> str:
+    """An unquoted Snowflake identifier (stored upper case). Anything else is refused,
+    so table and column names can never inject SQL."""
+    if not _IDENT.fullmatch(name):
+        raise ValueError(f"not a plain identifier: {name!r}")
+    return name.upper()
+
+
+@dataclass(frozen=True)
+class Target:
+    database: str = "ECOM"
+    schema: str = "GOLD"
+    warehouse: str = "ECOM_WH"
+    stage: str = "GOLD_STAGE"
+
+    def __post_init__(self):
+        for value in (self.database, self.schema, self.warehouse, self.stage):
+            ident(value)
+
+    @property
+    def qualified(self) -> str:
+        return f"{ident(self.database)}.{ident(self.schema)}"
+
+    def stage_path(self, table: str) -> str:
+        return f"@{self.qualified}.{ident(self.stage)}/{ident(table).lower()}/"
+
+
+def setup_sql(t: Target) -> List[str]:
+    return [
+        f"CREATE WAREHOUSE IF NOT EXISTS {ident(t.warehouse)} WAREHOUSE_SIZE = 'XSMALL' "
+        f"AUTO_SUSPEND = 60 AUTO_RESUME = TRUE INITIALLY_SUSPENDED = TRUE",
+        f"USE WAREHOUSE {ident(t.warehouse)}",
+        f"CREATE DATABASE IF NOT EXISTS {ident(t.database)}",
+        f"CREATE SCHEMA IF NOT EXISTS {t.qualified}",
+        f"USE SCHEMA {t.qualified}",
+        f"CREATE FILE FORMAT IF NOT EXISTS {t.qualified}.PARQUET_FMT TYPE = PARQUET",
+        f"CREATE STAGE IF NOT EXISTS {t.qualified}.{ident(t.stage)} FILE_FORMAT = {t.qualified}.PARQUET_FMT",
+    ]
+
+
+def table_ddl(t: Target, table: str, columns: Sequence[Tuple[str, str]]) -> str:
+    cols = ",\n    ".join(f"{ident(name)} {snowflake_type(dtype)}" for name, dtype in columns)
+    return f"CREATE OR REPLACE TABLE {t.qualified}.{ident(table)} (\n    {cols}\n)"
+
+
+def put_sql(t: Target, table: str, files_dir) -> str:
+    pattern = (Path(files_dir).resolve() / "*.parquet").as_posix()
+    if "'" in pattern:
+        raise ValueError(f"a quote in the path is not supported: {pattern}")
+    return f"PUT 'file://{pattern}' {t.stage_path(table)} AUTO_COMPRESS = FALSE OVERWRITE = TRUE"
+
+
+def load_sql(t: Target, table: str, files_dir) -> List[str]:
+    return [
+        f"REMOVE {t.stage_path(table)}",
+        put_sql(t, table, files_dir),
+        f"COPY INTO {t.qualified}.{ident(table)} FROM {t.stage_path(table)} "
+        f"FILE_FORMAT = (FORMAT_NAME = {t.qualified}.PARQUET_FMT) "
+        f"MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE PURGE = TRUE",
+    ]
+
+
+def count_sql(t: Target, table: str) -> str:
+    return f"SELECT COUNT(*) FROM {t.qualified}.{ident(table)}"
+
+
+def script(manifest: Dict[str, dict], t: Target) -> str:
+    """The whole load as one SQL script (PUT needs a client: SnowSQL or the Snowflake CLI)."""
+    lines = ["-- Generated by `python -m ecom_etl export-snowflake`. Run with SnowSQL or `snow sql -f`.",
+             "-- PUT uploads local files, so it does not work in a Snowsight worksheet.", ""]
+    lines += [s + ";" for s in setup_sql(t)]
+    for table, info in manifest.items():
+        lines += ["", f"-- {table}: {info['rows']:,} rows expected",
+                  table_ddl(t, table, info["columns"]) + ";"]
+        lines += [s + ";" for s in load_sql(t, table, info["files"])]
+        lines.append(count_sql(t, table) + ";")
+    return "\n".join(lines) + "\n"
+
+
+def load(conn, manifest: Dict[str, dict], t: Target, tables: Iterable[str] = None) -> Dict[str, dict]:
+    """Run the load on a DB-API connection. Returns, per table, expected and loaded rows."""
+    cur = conn.cursor()
+    for statement in setup_sql(t):
+        cur.execute(statement)
+    results: Dict[str, dict] = {}
+    for table in (tables or manifest):
+        info = manifest[table]
+        cur.execute(table_ddl(t, table, info["columns"]))
+        for statement in load_sql(t, table, info["files"]):
+            cur.execute(statement)
+        cur.execute(count_sql(t, table))
+        loaded = cur.fetchone()[0]
+        results[table] = {"expected": info["rows"], "loaded": loaded, "ok": loaded == info["rows"]}
+    return results
+
+
+def connect_from_env():
+    """A Snowflake connection from environment variables.
+
+    SNOWFLAKE_ACCOUNT and SNOWFLAKE_USER are required; SNOWFLAKE_ROLE is optional.
+    Authentication, first one set wins: SNOWFLAKE_PRIVATE_KEY_FILE (key-pair, the
+    recommended way for scripts), SNOWFLAKE_AUTHENTICATOR (for example
+    ``externalbrowser``), SNOWFLAKE_PASSWORD. Never put these in the repository.
+    """
+    import snowflake.connector  # pip install -e ".[snowflake]"
+
+    missing = [k for k in ("SNOWFLAKE_ACCOUNT", "SNOWFLAKE_USER") if not os.environ.get(k)]
+    if missing:
+        raise RuntimeError("set " + " and ".join(missing))
+    kwargs = {"account": os.environ["SNOWFLAKE_ACCOUNT"], "user": os.environ["SNOWFLAKE_USER"]}
+    if os.environ.get("SNOWFLAKE_ROLE"):
+        kwargs["role"] = os.environ["SNOWFLAKE_ROLE"]
+    if os.environ.get("SNOWFLAKE_PRIVATE_KEY_FILE"):
+        kwargs["private_key_file"] = os.environ["SNOWFLAKE_PRIVATE_KEY_FILE"]
+    elif os.environ.get("SNOWFLAKE_AUTHENTICATOR"):
+        kwargs["authenticator"] = os.environ["SNOWFLAKE_AUTHENTICATOR"]
+    elif os.environ.get("SNOWFLAKE_PASSWORD"):
+        kwargs["password"] = os.environ["SNOWFLAKE_PASSWORD"]
+    else:
+        raise RuntimeError("set SNOWFLAKE_PRIVATE_KEY_FILE, SNOWFLAKE_AUTHENTICATOR or SNOWFLAKE_PASSWORD")
+    return snowflake.connector.connect(**kwargs)
