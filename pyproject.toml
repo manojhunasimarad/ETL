@@ -14,6 +14,7 @@ dependencies = ["pandas>=2.0"]
 [project.optional-dependencies]
 dev = ["pytest>=7"]
 kaggle = ["kaggle>=1.6"]
+postgres = ["psycopg[binary]>=3.1"]
 
 [project.scripts]
 ecom-etl = "ecom_etl.cli:main"
@@ -21,6 +22,14 @@ ecom-etl = "ecom_etl.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+ecom_etl = ["sql/*.sql"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+    "postgres: needs a running Postgres 16+ (docker compose up -d postgres)",
+    "spark: needs pyspark and Java 17+",
+    "kafka: needs a Kafka-compatible broker (Redpanda)",
+]

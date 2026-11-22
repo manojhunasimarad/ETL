@@ -7,16 +7,43 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ecom
+          POSTGRES_PASSWORD: ecom
+          POSTGRES_DB: ecom
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ecom -d ecom"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      ECOM_DB_HOST: localhost
+      # services listed here must be available, otherwise the run fails
+      ECOM_REQUIRE_INFRA: postgres
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
       - name: Install
-        run: pip install -e ".[dev]"
-      - name: Unit tests
-        run: pytest -q
-      - name: Smoke run (generate + profile)
+        run: pip install -e ".[dev,postgres]"
+      - name: Tests (unit + integration)
+        run: pytest -q -rs
+      - name: Smoke run
         run: |
           python -m ecom_etl generate --orders 5000
           python -m ecom_etl profile --source synthetic
+          python -m ecom_etl load-raw --source synthetic
+          python -m ecom_etl build-core --source synthetic
+
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Validate docker-compose.yml
+        run: docker compose --profile tools config --quiet
+      - name: Pull images
+        run: docker compose --profile tools pull --quiet

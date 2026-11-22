@@ -1,10 +1,12 @@
 """Command line entry point: ``python -m ecom_etl <command>``.
 
-Commands added so far (Step 1):
+Commands:
   generate        write synthetic Olist-shaped CSVs with injected defects
   download-olist  fetch the real Olist dataset from Kaggle (or a local zip)
   validate        check files and headers against the source contract
   profile         profile a source and write a markdown report
+  load-raw        (step 2) copy the CSV files into Postgres <source>_raw
+  build-core      (step 2) build the normalized <source>_core schema with SQL
 """
 
 from __future__ import annotations
@@ -95,6 +97,46 @@ def _cmd_profile(args: argparse.Namespace) -> int:
     return 0
 
 
+def _source_extracted_at(directory: Path):
+    """Extraction moment: from the synthetic manifest, otherwise "now"."""
+    from datetime import datetime
+
+    from .contracts import TIMESTAMP_FORMAT
+
+    manifest = load_manifest(directory)
+    return datetime.strptime(manifest["extracted_at"], TIMESTAMP_FORMAT) if manifest else datetime.now()
+
+
+def _source_name(source: str) -> str:
+    return source if source in config.KNOWN_SOURCES else Path(source).name
+
+
+def _cmd_load_raw(args: argparse.Namespace) -> int:
+    from .landing import load_raw
+
+    directory = config.source_dir(args.source)
+    t0 = time.perf_counter()
+    counts = load_raw(directory, _source_name(args.source))
+    print(f"Loaded {directory} into schema {_source_name(args.source)}_raw in {time.perf_counter() - t0:.1f}s")
+    for table, rows in counts.items():
+        print(f"  {table:<22}{rows:>12,} rows")
+    return 0
+
+
+def _cmd_build_core(args: argparse.Namespace) -> int:
+    from .landing import build_core
+
+    directory = config.source_dir(args.source)
+    name = _source_name(args.source)
+    t0 = time.perf_counter()
+    result = build_core(name, _source_extracted_at(directory))
+    print(f"Built schema {name}_core in {time.perf_counter() - t0:.1f}s")
+    print(f"  {'table':<22}{'raw':>10}{'core':>10}{'removed':>10}")
+    for table, c in result.items():
+        print(f"  {table:<22}{c['raw']:>10,}{c['core']:>10,}{c['raw'] - c['core']:>10,}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="ecom_etl", description="E-commerce batch and streaming ETL")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -122,6 +164,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--source", default="synthetic", help="synthetic, olist, or a folder path")
     p.add_argument("--report", help="report path (default reports/profile_<source>.md)")
     p.set_defaults(func=_cmd_profile)
+
+    lr = sub.add_parser("load-raw", help="step 2: copy the CSV files into Postgres <source>_raw")
+    lr.add_argument("--source", default="synthetic", help="synthetic, olist, or a folder path")
+    lr.set_defaults(func=_cmd_load_raw)
+
+    bc = sub.add_parser("build-core", help="step 2: build the normalized <source>_core schema with SQL")
+    bc.add_argument("--source", default="synthetic", help="synthetic, olist, or a folder path")
+    bc.set_defaults(func=_cmd_build_core)
     return parser
 
 

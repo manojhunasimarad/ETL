@@ -1,0 +1,40 @@
+# Local stack. Start what a step needs:
+#   docker compose up -d postgres            # step 2+
+#   docker compose --profile tools up -d     # + pgAdmin on http://localhost:5050
+name: ecom-etl
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${ECOM_DB_USER:-ecom}
+      POSTGRES_PASSWORD: ${ECOM_DB_PASSWORD:-ecom}
+      POSTGRES_DB: ${ECOM_DB_NAME:-ecom}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ECOM_DB_USER:-ecom} -d ${ECOM_DB_NAME:-ecom}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  pgadmin:
+    image: dpage/pgadmin4:9
+    profiles: ["tools"]
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "5050:80"
+    volumes:
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
