@@ -11,8 +11,12 @@ COPY pyproject.toml README.md ./
 COPY src ./src
 RUN pip install --no-cache-dir -e ".[spark,postgres]"
 
+# Postgres JDBC driver baked in: runs need no internet access to Maven
+ADD https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.4/postgresql-42.7.4.jar /opt/jars/postgresql.jar
+
 ENV PYTHONUNBUFFERED=1 \
-    ECOM_SPARK_DRIVER_MEMORY=2g
+    ECOM_SPARK_DRIVER_MEMORY=2g \
+    ECOM_SPARK_JARS=/opt/jars/postgresql.jar
 
 ENTRYPOINT ["python", "-m", "ecom_etl"]
 CMD ["--help"]

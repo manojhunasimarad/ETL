@@ -44,6 +44,8 @@ jobs:
           python -m ecom_etl build-core --source synthetic
           python -m ecom_etl bronze --source synthetic
           python -m ecom_etl silver --source synthetic
+          python -m ecom_etl gold --source synthetic
+          python -m ecom_etl load-gold --source synthetic
 
   compose:
     runs-on: ubuntu-latest
@@ -62,3 +64,5 @@ jobs:
           docker compose run --rm pipeline generate --orders 2000
           docker compose run --rm pipeline bronze --source synthetic
           docker compose run --rm pipeline silver --source synthetic
+          docker compose run --rm pipeline gold --source synthetic
+          docker compose run --rm pipeline load-gold --source synthetic

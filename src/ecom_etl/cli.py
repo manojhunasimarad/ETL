@@ -9,6 +9,8 @@ Commands:
   build-core      (step 2) build the normalized <source>_core schema with SQL
   bronze          (step 3) CSV -> bronze Parquet with lineage columns (Spark)
   silver          (step 3) bronze -> silver + quarantine (Spark)
+  gold            (step 4) silver -> star schema (Spark)
+  load-gold       (step 4) star schema -> Postgres <source>_gold (JDBC)
 """
 
 from __future__ import annotations
@@ -139,11 +141,43 @@ def _cmd_build_core(args: argparse.Namespace) -> int:
     return 0
 
 
-def _spark_and_lake(source: str):
+def _spark_and_lake(source: str, jdbc: bool = False):
+    """SparkSession + lake for a source. ``jdbc`` adds the Postgres driver
+    (downloaded once from Maven, unless ECOM_SPARK_JARS points at a local jar)."""
+    import os
+
     from .spark.lake import Lake
     from .spark.session import get_spark
+    from .spark.warehouse import PG_JDBC_PACKAGE
 
-    return get_spark(f"ecom_etl-{_source_name(source)}"), Lake.for_source(_source_name(source))
+    packages = (PG_JDBC_PACKAGE,) if jdbc and not os.environ.get("ECOM_SPARK_JARS") else ()
+    return (get_spark(f"ecom_etl-{_source_name(source)}", packages=packages),
+            Lake.for_source(_source_name(source)))
+
+
+def _cmd_gold(args: argparse.Namespace) -> int:
+    from .spark.gold import run_gold
+
+    spark, lake = _spark_and_lake(args.source)
+    t0 = time.perf_counter()
+    counts = run_gold(spark, lake)
+    print(f"Gold (star schema) written to {lake.root / 'gold'} in {time.perf_counter() - t0:.1f}s")
+    for table, rows in counts.items():
+        print(f"  {table:<22}{rows:>12,} rows")
+    return 0
+
+
+def _cmd_load_gold(args: argparse.Namespace) -> int:
+    from .spark.warehouse import load_gold
+
+    spark, lake = _spark_and_lake(args.source, jdbc=True)
+    t0 = time.perf_counter()
+    counts = load_gold(spark, lake, _source_name(args.source))
+    print(f"Loaded gold into Postgres schema {_source_name(args.source)}_gold "
+          f"in {time.perf_counter() - t0:.1f}s")
+    for table, rows in counts.items():
+        print(f"  {table:<22}{rows:>12,} rows")
+    return 0
 
 
 def _cmd_bronze(args: argparse.Namespace) -> int:
@@ -236,6 +270,14 @@ def build_parser() -> argparse.ArgumentParser:
     sv = sub.add_parser("silver", help="step 3: bronze -> silver + quarantine (Spark)")
     sv.add_argument("--source", default="synthetic", help="synthetic, olist, or a folder path")
     sv.set_defaults(func=_cmd_silver)
+
+    gd = sub.add_parser("gold", help="step 4: silver -> star schema (Spark)")
+    gd.add_argument("--source", default="synthetic", help="synthetic, olist, or a folder path")
+    gd.set_defaults(func=_cmd_gold)
+
+    lg = sub.add_parser("load-gold", help="step 4: load the star schema into Postgres <source>_gold")
+    lg.add_argument("--source", default="synthetic", help="synthetic, olist, or a folder path")
+    lg.set_defaults(func=_cmd_load_gold)
     return parser
 
 

@@ -17,6 +17,10 @@ DEFAULTS = {
     "spark.sql.adaptive.enabled": "true",
     "spark.driver.memory": os.environ.get("ECOM_SPARK_DRIVER_MEMORY", "2g"),
     "spark.ui.showConsoleProgress": "false",
+    # JDBC writes convert timestamps with the JVM time zone, not the session
+    # one; pin it too, or Postgres would get IST-shifted times on an IST laptop.
+    "spark.driver.extraJavaOptions": "-Duser.timezone=UTC",
+    "spark.executor.extraJavaOptions": "-Duser.timezone=UTC",
 }
 
 
