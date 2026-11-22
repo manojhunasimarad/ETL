@@ -105,6 +105,23 @@ docker compose run --rm pipeline run --source synthetic     # whole pipeline
 docker compose run --rm pipeline quality --source synthetic # re-check only
 ```
 
+Output of `run` on 20,000 synthetic orders at the default 1% defect rate
+(CI run, 4-vCPU GitHub runner):
+
+```
+Pipeline success in 46.42s: bronze 5.74s, silver 25.99s, silver_checks 3.5s,
+                            gold 6.03s, gold_checks 2.43s, load 2.73s
+Data quality: 115 checks (80 row-level, 35 table-level), 14 flagged, 0 blocking
+  bronze records 91,521: quarantined 3,497, duplicates removed 622, fixed 471
+  vs injected defects: quarantine precision 100.0%, recall 100.0%
+  [warn] orders.volume_change: 4805 -> 19194 rows
+  [warn] orders.payment_reconciliation: 100 orders differ by more than 1.00
+```
+
+The volume warning is correct: the previous run in that job had 5,000
+orders. Of the 3,497 quarantined rows, 1,762 are injected defects (all
+caught, none wrong) and the rest are lines and payments of rejected orders.
+
 Then open `reports/dq_report_synthetic.md`. On Olist:
 
 ```bash

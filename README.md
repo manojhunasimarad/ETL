@@ -23,8 +23,8 @@ See the [roadmap](docs/ROADMAP.md).
 | 2 | [Postgres landing zone and normalization](docs/steps/STEP-02-postgres.md) | **done** |
 | 3 | [Batch with PySpark: bronze to silver](docs/steps/STEP-03-spark.md) | **done** |
 | 4 | [Dimensional model (star schema, SCD Type 2)](docs/steps/STEP-04-star-schema.md) | **done** |
-| 5 | Data quality framework | next |
-| 6 | SQL analysis and dashboard | |
+| 5 | [Data quality framework](docs/steps/STEP-05-data-quality.md) | **done** |
+| 6 | SQL analysis and dashboard | next |
 | 7 | Performance tuning (Spark and SQL) | |
 | 8 | Orchestration with Airflow | |
 | 9 | Streaming with Kafka and Spark Structured Streaming | |
