@@ -9,7 +9,7 @@ Built on two datasets with the same schema:
 - **Olist**: the real Brazilian e-commerce dataset from Kaggle (about 100k orders, real data quality problems).
 - **Synthetic**: an Olist-shaped generator that scales to millions of rows and records every defect it injects, so the quality checks can be measured against ground truth.
 
-Stack (when complete): Python, PySpark, SQL, Postgres, Metabase, Airflow, Kafka (Redpanda), Docker, Databricks, Snowflake.
+Stack (when complete): Python, PySpark, SQL, Postgres, Streamlit, Airflow, Kafka (Redpanda), Docker, Databricks, Snowflake.
 
 ## Status
 

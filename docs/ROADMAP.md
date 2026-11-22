@@ -18,7 +18,7 @@ against a campus-hire Data Engineer job description (see the mapping below).
 | 3 | Batch with PySpark: bronze to silver | Explicit Spark schemas, typing and cleaning, dedupe, partitioned Parquet lake | 06-batch | **done** |
 | 4 | Dimensional model (gold) | `fact_order_line` (grain: one row per order line), `fact_payment`, `dim_customer` as **SCD Type 2**, `dim_product`, `dim_seller`, `dim_date`; surrogate keys; load to Postgres | 03-data-warehouse, 04-analytics-engineering | **done** |
 | 5 | Data quality framework | Checks for nulls, duplicates, referential integrity, freshness, accepted values, ranges; quarantine tables; run report; precision and recall against `_defects.csv` | 04 (tests), 05-data-platforms | **done** |
-| 6 | SQL analysis and dashboard | 10 business questions in SQL (CTEs, window functions); Metabase dashboard on the star schema | 03, 04 | next |
+| 6 | SQL analysis and dashboard | 10 business questions in SQL (CTEs, window functions); Streamlit dashboard (as code, tested in CI) on the star schema and the data quality history | 03, 04 | next |
 | 7 | Performance tuning | Spark: partitioning, broadcast joins, AQE, skew, file sizing. SQL: indexes, `EXPLAIN ANALYZE`. Baseline vs tuned timings recorded | 03 (partitioning), 06 (join internals) | |
 | 8 | Orchestration with Airflow | Airflow in Docker, DAG for the batch pipeline, retries, backfills, idempotent reruns | 02-workflow-orchestration (Zoomcamp uses Kestra; we use Airflow) | |
 | 9 | Streaming | Redpanda/Kafka, order and payment event producer, Spark Structured Streaming with schema, watermark, dedupe and windowed metrics | 07-streaming | |
@@ -77,7 +77,7 @@ flowchart LR
     B --> Q
     S -->|star schema| F
     S --> D
-    F --> M[Metabase dashboard]
+    F --> M[Streamlit dashboard]
     D --> M
     AF[Airflow DAG] -.orchestrates.-> B
     AF -.-> S
@@ -99,7 +99,7 @@ Every `XX` in the resume bullets is produced by a command and recorded in
 | cutting runtime from **XX** to **XX** | Step 7 | benchmark script, baseline vs tuned, same data and machine |
 
 Optional fourth bullet after step 6, for example: "Answered XX business
-questions in SQL (CTEs, window functions) and built a Metabase dashboard
+questions in SQL (CTEs, window functions) and built a Streamlit dashboard
 on the star schema for revenue and delivery metrics."
 
 ## Learning material by step

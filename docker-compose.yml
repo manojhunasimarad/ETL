@@ -1,6 +1,7 @@
 # Local stack. Start what a step needs:
 #   docker compose up -d postgres            # step 2+
 #   docker compose --profile tools up -d     # + pgAdmin on http://localhost:5050
+#   docker compose --profile dashboard up -d # + Streamlit dashboard on http://localhost:8501
 name: ecom-etl
 
 services:
@@ -34,6 +35,26 @@ services:
       - ./data:/app/data
       - ./reports:/app/reports
       - ./src:/app/src          # code changes apply without rebuilding
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Streamlit dashboard on http://localhost:8501
+  #   docker compose --profile dashboard up -d dashboard
+  dashboard:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: ecom-etl/pipeline:latest
+    profiles: ["dashboard"]
+    entrypoint: ["streamlit", "run", "dashboard/app.py", "--server.address=0.0.0.0", "--server.port=8501"]
+    environment:
+      ECOM_DB_HOST: postgres
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./dashboard:/app/dashboard
+      - ./src:/app/src
     depends_on:
       postgres:
         condition: service_healthy

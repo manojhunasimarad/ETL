@@ -1,5 +1,5 @@
 # Pipeline image: Python 3.11 + Java 17 + PySpark + this package.
-# Used by `docker compose run --rm pipeline <command>` and by Airflow (step 8).
+# Used by `docker compose run --rm pipeline <command>`, the dashboard and Airflow (step 8).
 FROM python:3.11-slim-bookworm
 
 RUN apt-get update \
@@ -9,7 +9,8 @@ RUN apt-get update \
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
-RUN pip install --no-cache-dir -e ".[spark,postgres]"
+RUN pip install --no-cache-dir -e ".[spark,postgres,dashboard]"
+COPY dashboard ./dashboard
 
 # Postgres JDBC driver baked in: runs need no internet access to Maven
 ADD https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.4/postgresql-42.7.4.jar /opt/jars/postgresql.jar

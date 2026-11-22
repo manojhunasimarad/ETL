@@ -33,7 +33,7 @@ jobs:
           echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
           "$JAVA_HOME_17_X64/bin/java" -version
       - name: Install
-        run: pip install -e ".[dev,postgres,spark]"
+        run: pip install -e ".[dev,postgres,spark,dashboard]"
       - name: Tests (unit + integration)
         run: pytest -q -rs
       - name: Smoke run
@@ -50,6 +50,7 @@ jobs:
           python -m ecom_etl generate --orders 20000 --out data/raw/synthetic
           python -m ecom_etl run --source synthetic
           cat reports/dq_report_synthetic.md
+          python -m ecom_etl analyze --source synthetic
 
   compose:
     runs-on: ubuntu-latest
@@ -71,3 +72,9 @@ jobs:
           docker compose run --rm pipeline gold --source synthetic
           docker compose run --rm pipeline load-gold --source synthetic
           docker compose run --rm pipeline run --source synthetic
+      - name: Dashboard serves in Docker
+        run: |
+          docker compose --profile dashboard up -d dashboard
+          for i in $(seq 1 30); do curl -fs http://localhost:8501/_stcore/health && break; sleep 2; done
+          curl -fs http://localhost:8501/_stcore/health
+          docker compose --profile dashboard logs dashboard | tail -20

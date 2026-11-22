@@ -13,6 +13,7 @@ Commands:
   load-gold       (step 4) star schema -> Postgres <source>_gold (JDBC)
   quality         (step 5) all data quality checks + report (+ history in Postgres)
   run             (step 5) the whole batch pipeline with quality gates
+  analyze         (step 6) 10 business questions in SQL -> reports/analysis_<source>.md
 """
 
 from __future__ import annotations
@@ -280,6 +281,22 @@ def _cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_analyze(args: argparse.Namespace) -> int:
+    from .analysis import render_markdown, run_analyses
+
+    name = _source_name(args.source)
+    analyses = run_analyses(name)
+    report = config.REPORTS_DIR / f"analysis_{name}.md"
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text(render_markdown(name, analyses), encoding="utf-8")
+    for a in analyses:
+        print(f"{a.question}  [{len(a.rows)} rows]")
+        if a.rows:
+            print("    " + " | ".join(f"{c}={v}" for c, v in zip(a.columns, a.rows[0])))
+    print(f"\nReport: {report}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="ecom_etl", description="E-commerce batch and streaming ETL")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -341,6 +358,10 @@ def build_parser() -> argparse.ArgumentParser:
     rn.add_argument("--source", default="synthetic", help="synthetic, olist, or a folder path")
     rn.add_argument("--no-load", action="store_true", help="stop after gold; do not touch Postgres")
     rn.set_defaults(func=_cmd_run)
+
+    an = sub.add_parser("analyze", help="step 6: run the 10 business questions in SQL on <source>_gold")
+    an.add_argument("--source", default="synthetic", help="synthetic, olist, or a folder path")
+    an.set_defaults(func=_cmd_analyze)
     return parser
 
 
