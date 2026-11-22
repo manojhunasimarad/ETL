@@ -91,7 +91,16 @@ Test a DAG without the UI:
 docker compose --profile airflow exec airflow airflow dags test ecom_batch_pipeline
 ```
 
-CI runs exactly that on every push (job `airflow`).
+CI runs exactly that on every push (job `airflow`): all eight tasks
+succeed in about two and a half minutes on 3,000 synthetic orders. The
+`compose` job also starts this Airflow container and waits for
+`/api/v2/monitor/health`.
+
+One thing that went wrong while building this, worth knowing: the official
+image's entrypoint waits for the metadata database *before* running any
+command, so a start script that creates that database never got the chance.
+`CONNECTION_CHECK_MAX_COUNT: "0"` in `docker-compose.yml` turns that wait
+off, and `docker/airflow-start.sh` creates the `airflow` database first.
 
 ## 3. Exercises
 

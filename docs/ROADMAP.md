@@ -20,8 +20,8 @@ against a campus-hire Data Engineer job description (see the mapping below).
 | 5 | Data quality framework | Checks for nulls, duplicates, referential integrity, freshness, accepted values, ranges; quarantine tables; run report; precision and recall against `_defects.csv` | 04 (tests), 05-data-platforms | **done** |
 | 6 | SQL analysis and dashboard | 10 business questions in SQL (CTEs, window functions); Streamlit dashboard (as code, tested in CI) on the star schema and the data quality history | 03, 04 | **done** |
 | 7 | Performance tuning | Spark: partitioning, broadcast joins, AQE, skew, file sizing. SQL: indexes, `EXPLAIN ANALYZE`. Baseline vs tuned timings recorded | 03 (partitioning), 06 (join internals) | **done** |
-| 8 | Orchestration with Airflow | Airflow in Docker, DAG for the batch pipeline, retries, backfills, idempotent reruns | 02-workflow-orchestration (Zoomcamp uses Kestra; we use Airflow) | next |
-| 9 | Streaming | Redpanda/Kafka, order and payment event producer, Spark Structured Streaming with schema, watermark, dedupe and windowed metrics | 07-streaming | |
+| 8 | Orchestration with Airflow | Airflow in Docker, DAG for the batch pipeline, retries, backfills, idempotent reruns | 02-workflow-orchestration (Zoomcamp uses Kestra; we use Airflow) | **done** |
+| 9 | Streaming | Redpanda/Kafka, order and payment event producer, Spark Structured Streaming with schema, watermark, dedupe and windowed metrics | 07-streaming | next |
 | 10 | Cloud platforms and wrap-up | Same Spark job on Databricks Free Edition; gold tables in a Snowflake trial; full CI; final numbers | Final project | |
 
 Steps 1 to 7 cover the job description's required skills and duties.
@@ -115,6 +115,6 @@ Each step note lists exact chapters and videos; this is the plan.
 | 5 | *Data Quality Fundamentals* ch. 1-4 | | **done** |
 | 6 | *SQL for Data Analysis* (Tanimura) | | **done** |
 | 7 | *Learning Spark* ch. 7; *High Performance Spark* | | **done** |
-| 8 | *Data Pipelines Pocket Reference*; Airflow docs | Hands-On Introduction: Data Engineering (Airflow) | next |
-| 9 | *Kafka: The Definitive Guide, 2nd Ed.*; *Learning Spark* ch. 8 | Apache Kafka Essential Training: Getting Started | Zoomcamp module 07 |
+| 8 | *Data Pipelines Pocket Reference*; Airflow docs | Hands-On Introduction: Data Engineering (Airflow) | **done** |
+| 9 | *Kafka: The Definitive Guide, 2nd Ed.*; *Learning Spark* ch. 8 | Apache Kafka Essential Training: Getting Started | next |
 | 10 | *Snowflake Data Engineering* (Manning, on O'Reilly); *Data Engineering Design Patterns* | | Databricks Free Edition docs, Snowflake trial docs |
