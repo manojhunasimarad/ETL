@@ -77,6 +77,16 @@ docker compose --profile dashboard up -d dashboard           # http://localhost:
 Without Docker: `pip install -e ".[postgres,dashboard]"`, then
 `streamlit run dashboard/app.py`.
 
+First row of each answer on 20,000 synthetic orders (CI run):
+
+```
+Q2  category=cool_stuff        items_revenue=311,987.88  share_pct=12.99
+Q3  customer_state=SP          revenue=1,105,722.19      revenue_rank=1
+Q5  customers=18,019           repeat_customers=511      repeat_rate_pct=2.84
+Q6  payment_type=credit_card   value_share_pct=75.06     avg_installments=2.87
+Q7  seller_rank=1              cumulative_revenue_pct=5.2 (top 0.2% of sellers)
+```
+
 ## 3. Exercises
 
 1. Rewrite Q1 without a window function (self-join on the previous month). Compare readability and the `EXPLAIN` plan.

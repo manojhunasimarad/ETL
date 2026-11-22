@@ -18,8 +18,8 @@ against a campus-hire Data Engineer job description (see the mapping below).
 | 3 | Batch with PySpark: bronze to silver | Explicit Spark schemas, typing and cleaning, dedupe, partitioned Parquet lake | 06-batch | **done** |
 | 4 | Dimensional model (gold) | `fact_order_line` (grain: one row per order line), `fact_payment`, `dim_customer` as **SCD Type 2**, `dim_product`, `dim_seller`, `dim_date`; surrogate keys; load to Postgres | 03-data-warehouse, 04-analytics-engineering | **done** |
 | 5 | Data quality framework | Checks for nulls, duplicates, referential integrity, freshness, accepted values, ranges; quarantine tables; run report; precision and recall against `_defects.csv` | 04 (tests), 05-data-platforms | **done** |
-| 6 | SQL analysis and dashboard | 10 business questions in SQL (CTEs, window functions); Streamlit dashboard (as code, tested in CI) on the star schema and the data quality history | 03, 04 | next |
-| 7 | Performance tuning | Spark: partitioning, broadcast joins, AQE, skew, file sizing. SQL: indexes, `EXPLAIN ANALYZE`. Baseline vs tuned timings recorded | 03 (partitioning), 06 (join internals) | |
+| 6 | SQL analysis and dashboard | 10 business questions in SQL (CTEs, window functions); Streamlit dashboard (as code, tested in CI) on the star schema and the data quality history | 03, 04 | **done** |
+| 7 | Performance tuning | Spark: partitioning, broadcast joins, AQE, skew, file sizing. SQL: indexes, `EXPLAIN ANALYZE`. Baseline vs tuned timings recorded | 03 (partitioning), 06 (join internals) | next |
 | 8 | Orchestration with Airflow | Airflow in Docker, DAG for the batch pipeline, retries, backfills, idempotent reruns | 02-workflow-orchestration (Zoomcamp uses Kestra; we use Airflow) | |
 | 9 | Streaming | Redpanda/Kafka, order and payment event producer, Spark Structured Streaming with schema, watermark, dedupe and windowed metrics | 07-streaming | |
 | 10 | Cloud platforms and wrap-up | Same Spark job on Databricks Free Edition; gold tables in a Snowflake trial; full CI; final numbers | Final project | |
@@ -113,8 +113,8 @@ Each step note lists exact chapters and videos; this is the plan.
 | 3 | *Learning Spark, 2nd Ed.* ch. 1-4 | Apache Spark Essential Training: Big Data Engineering | **done** |
 | 4 | *The Data Warehouse Toolkit, 3rd Ed.* ch. 1-3, and ch. 5 for slowly changing dimensions | Introduction to Data Warehouses | **done** |
 | 5 | *Data Quality Fundamentals* ch. 1-4 | | **done** |
-| 6 | *SQL for Data Analysis* (Tanimura) | | next |
-| 7 | *Learning Spark* ch. 7; *High Performance Spark* | | Zoomcamp module 06 (join internals) |
+| 6 | *SQL for Data Analysis* (Tanimura) | | **done** |
+| 7 | *Learning Spark* ch. 7; *High Performance Spark* | | next |
 | 8 | *Data Pipelines Pocket Reference*; Airflow docs | Hands-On Introduction: Data Engineering (Airflow) | Udemy: Marc Lamberti's Airflow course |
 | 9 | *Kafka: The Definitive Guide, 2nd Ed.*; *Learning Spark* ch. 8 | Apache Kafka Essential Training: Getting Started | Zoomcamp module 07 |
 | 10 | *Snowflake Data Engineering* (Manning, on O'Reilly); *Data Engineering Design Patterns* | | Databricks Free Edition docs, Snowflake trial docs |
