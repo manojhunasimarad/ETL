@@ -200,21 +200,15 @@ def _cmd_bronze(args: argparse.Namespace) -> int:
 
 
 def _cmd_silver(args: argparse.Namespace) -> int:
-    from dataclasses import asdict
-
     from .contracts import TIMESTAMP_FORMAT
     from .spark.lake import new_run_id
     from .spark.silver import run_silver
 
     spark, lake = _spark_and_lake(args.source)
     extracted_at = _source_extracted_at(config.source_dir(args.source)).strftime(TIMESTAMP_FORMAT)
-    run_id = new_run_id()
     t0 = time.perf_counter()
-    reports = run_silver(spark, lake, extracted_at)
+    reports = run_silver(spark, lake, extracted_at, new_run_id())
     elapsed = time.perf_counter() - t0
-    lake.write_report(f"silver_{run_id}", {"run_id": run_id, "seconds": round(elapsed, 2),
-                                            "extracted_at": extracted_at,
-                                            "tables": {k: asdict(v) for k, v in reports.items()}})
     print(f"Silver written to {lake.root / 'silver'} in {elapsed:.1f}s")
     print(f"  {'table':<22}{'bronze':>10}{'dupes':>8}{'quarantine':>12}{'silver':>10}")
     for name, r in reports.items():

@@ -25,7 +25,7 @@ pickup before approval) are kept but flagged in ``_warnings``.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -39,7 +39,7 @@ from ..contracts import (
     Table,
 )
 from .bronze import LINEAGE_COLUMNS
-from .lake import Lake
+from .lake import Lake, new_run_id
 
 SPARK_TS_PATTERN = "yyyy-MM-dd HH:mm:ss"
 ZIP_COLUMNS = {"customer_zip_code_prefix", "seller_zip_code_prefix"}
@@ -277,8 +277,11 @@ def split_and_write(lake: Lake, table: Table, checked, report: TableReport, extr
     checked.unpersist()
 
 
-def run_silver(spark, lake: Lake, extracted_at: str) -> Dict[str, TableReport]:
-    """Build every silver and quarantine table. ``extracted_at``: 'yyyy-MM-dd HH:mm:ss'."""
+def run_silver(spark, lake: Lake, extracted_at: str, run_id: Optional[str] = None) -> Dict[str, TableReport]:
+    """Build every silver and quarantine table. ``extracted_at``: 'yyyy-MM-dd HH:mm:ss'.
+
+    Also writes ``_reports/silver_<run_id>.json``, which ``quality`` reads.
+    """
     from pyspark.sql import functions as F
 
     reports: Dict[str, TableReport] = {}
@@ -329,4 +332,7 @@ def run_silver(spark, lake: Lake, extracted_at: str) -> Dict[str, TableReport]:
 
     for name in ("orders", "order_items", "order_payments"):
         process(name)
+    run_id = run_id or new_run_id()
+    lake.write_report(f"silver_{run_id}", {"run_id": run_id, "extracted_at": extracted_at,
+                                            "tables": {k: asdict(v) for k, v in reports.items()}})
     return reports

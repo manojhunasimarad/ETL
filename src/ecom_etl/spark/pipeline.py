@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import time
-from dataclasses import asdict
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -88,9 +87,7 @@ def run_pipeline(spark, source_dir: Path, source: str, lake: Lake, extracted_at:
 
     try:
         extra["bronze_rows"] = timed("bronze", run_bronze, spark, source_dir, lake, run_id)
-        silver_reports = timed("silver", run_silver, spark, lake, extracted_at)
-        lake.write_report(f"silver_{run_id}", {"run_id": run_id, "extracted_at": extracted_at,
-                                                "tables": {k: asdict(v) for k, v in silver_reports.items()}})
+        silver_reports = timed("silver", run_silver, spark, lake, extracted_at, run_id)
         results += row_level_results(silver_reports)
         results += timed("silver_checks", silver_gate_results, spark, lake, silver_reports, extracted_at,
                          max_quarantine_rate)
