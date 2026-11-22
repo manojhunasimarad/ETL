@@ -1,0 +1,4 @@
+# Step 1 needs only pandas. Later steps add pyspark, airflow, kafka clients.
+# Recommended: pip install -e ".[dev]"   (installs the package + these)
+pandas>=2.0
+pytest>=7

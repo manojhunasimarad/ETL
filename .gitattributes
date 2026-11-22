@@ -1,0 +1,9 @@
+# Keep LF line endings in the repo and the working tree, also on Windows,
+# so shell scripts and Docker files work inside Linux containers.
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.png binary
+*.jpg binary
+*.zip binary
+*.parquet binary

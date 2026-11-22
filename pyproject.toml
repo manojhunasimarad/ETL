@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ecom-etl"
+version = "0.1.0"
+description = "E-commerce batch and streaming ETL pipeline on Olist and synthetic data"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Manoj Hunasimarad" }]
+dependencies = ["pandas>=2.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+kaggle = ["kaggle>=1.6"]
+
+[project.scripts]
+ecom-etl = "ecom_etl.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
