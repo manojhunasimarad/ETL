@@ -16,6 +16,9 @@ REPORTS_DIR = PROJECT_ROOT / "reports"
 
 KNOWN_SOURCES = ("synthetic", "olist")
 
+# Kafka: localhost:9092 from your laptop, kafka:29092 inside Docker Compose
+KAFKA_BOOTSTRAP = os.environ.get("ECOM_KAFKA_BOOTSTRAP", "localhost:9092")
+
 
 def source_dir(source: str) -> Path:
     """Map a source name ("synthetic", "olist") or a path to a directory."""

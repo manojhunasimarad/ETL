@@ -7,13 +7,16 @@ import pytest
 def spark():
     """One local SparkSession for all Spark tests (small settings, fast start).
 
-    The Postgres JDBC driver is fetched from Maven unless ECOM_SPARK_JARS
-    already points at a local jar (as in the Docker image).
+    The Kafka connector (and the Postgres JDBC driver, unless ECOM_SPARK_JARS
+    points at a local jar) is fetched from Maven once and cached by Ivy.
     """
     from ecom_etl.spark.session import get_spark
+    from ecom_etl.spark.streaming import kafka_package
     from ecom_etl.spark.warehouse import PG_JDBC_PACKAGE
 
-    packages = () if os.environ.get("ECOM_SPARK_JARS") else (PG_JDBC_PACKAGE,)
+    packages = [kafka_package()]
+    if not os.environ.get("ECOM_SPARK_JARS"):
+        packages.append(PG_JDBC_PACKAGE)
     session = get_spark("ecom-tests", conf={"spark.sql.shuffle.partitions": "4",
                                             "spark.default.parallelism": "4"}, packages=packages)
     yield session

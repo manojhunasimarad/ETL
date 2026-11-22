@@ -17,6 +17,7 @@ kaggle = ["kaggle>=1.6"]
 postgres = ["psycopg[binary]>=3.1"]
 spark = ["pyspark>=4.0,<4.2"]
 dashboard = ["streamlit>=1.36"]
+streaming = ["confluent-kafka>=2.3"]
 
 [project.scripts]
 ecom-etl = "ecom_etl.cli:main"

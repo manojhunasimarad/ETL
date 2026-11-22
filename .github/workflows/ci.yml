@@ -19,10 +19,18 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U ecom -d ecom"
           --health-interval 5s --health-timeout 5s --health-retries 20
+      kafka:
+        image: apache/kafka:4.1.2
+        ports:
+          - 9092:9092
+        options: >-
+          --health-cmd "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092"
+          --health-interval 5s --health-timeout 10s --health-retries 30
     env:
       ECOM_DB_HOST: localhost
+      ECOM_KAFKA_BOOTSTRAP: localhost:9092
       # services listed here must be available, otherwise the run fails
-      ECOM_REQUIRE_INFRA: postgres,spark
+      ECOM_REQUIRE_INFRA: postgres,spark,kafka
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -33,7 +41,7 @@ jobs:
           echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
           "$JAVA_HOME_17_X64/bin/java" -version
       - name: Install
-        run: pip install -e ".[dev,postgres,spark,dashboard]"
+        run: pip install -e ".[dev,postgres,spark,dashboard,streaming]"
       - name: Tests (unit + integration)
         run: pytest -q -rs
       - name: Smoke run
@@ -51,6 +59,8 @@ jobs:
           python -m ecom_etl run --source synthetic
           cat reports/dq_report_synthetic.md
           python -m ecom_etl analyze --source synthetic
+          python -m ecom_etl produce --source synthetic --limit 3000
+          python -m ecom_etl stream --source synthetic --reset
 
   airflow:
     runs-on: ubuntu-latest
@@ -126,6 +136,11 @@ jobs:
             exit 1
           fi
           docker compose --profile airflow exec -T airflow airflow dags list
+      - name: Streaming in Docker (Kafka + Spark Structured Streaming)
+        run: |
+          docker compose --profile streaming up -d --wait kafka
+          docker compose run --rm pipeline produce --source synthetic --limit 1000
+          docker compose run --rm pipeline stream --source synthetic --reset
       - name: Dashboard serves in Docker
         run: |
           docker compose --profile dashboard up -d dashboard

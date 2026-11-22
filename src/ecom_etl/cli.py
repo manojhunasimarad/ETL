@@ -15,6 +15,8 @@ Commands:
   run             (step 5) the whole batch pipeline with quality gates
   analyze         (step 6) 10 business questions in SQL -> reports/analysis_<source>.md
   benchmark       (step 7) baseline vs tuned Spark, partition pruning, Postgres indexes
+  produce         (step 9) send order events to Kafka, with duplicates, late and malformed messages
+  stream          (step 9) Spark Structured Streaming: Kafka -> bronze/silver/quarantine + daily revenue
 """
 
 from __future__ import annotations
@@ -145,16 +147,21 @@ def _cmd_build_core(args: argparse.Namespace) -> int:
     return 0
 
 
-def _spark_and_lake(source: str, jdbc: bool = False):
+def _spark_and_lake(source: str, jdbc: bool = False, kafka: bool = False):
     """SparkSession + lake for a source. ``jdbc`` adds the Postgres driver
-    (downloaded once from Maven, unless ECOM_SPARK_JARS points at a local jar)."""
+    (downloaded once from Maven, unless ECOM_SPARK_JARS points at a local jar);
+    ``kafka`` adds the Spark Kafka connector."""
     import os
 
     from .spark.lake import Lake
     from .spark.session import get_spark
     from .spark.warehouse import PG_JDBC_PACKAGE
 
-    packages = (PG_JDBC_PACKAGE,) if jdbc and not os.environ.get("ECOM_SPARK_JARS") else ()
+    packages = [PG_JDBC_PACKAGE] if jdbc and not os.environ.get("ECOM_SPARK_JARS") else []
+    if kafka:
+        from .spark.streaming import kafka_package
+
+        packages.append(kafka_package())
     return (get_spark(f"ecom_etl-{_source_name(source)}", packages=packages),
             Lake.for_source(_source_name(source)))
 
@@ -324,6 +331,38 @@ def _cmd_benchmark(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_produce(args: argparse.Namespace) -> int:
+    from .events import build_order_events, produce, stats_dict
+
+    events = build_order_events(config.source_dir(args.source), limit=args.limit)
+    print(f"Sending {len(events):,} order events to {args.topic} on {args.bootstrap} ...")
+    stats = produce(events, args.bootstrap, args.topic, rate=args.rate, duplicate_rate=args.duplicate_rate,
+                    late_rate=args.late_rate, malformed_rate=args.malformed_rate)
+    for key, value in stats_dict(stats).items():
+        print(f"  {key:<22}{value}")
+    return 0
+
+
+def _cmd_stream(args: argparse.Namespace) -> int:
+    from .spark.streaming import run_continuous, run_streaming
+
+    spark, lake = _spark_and_lake(args.source, kafka=True)
+    name = _source_name(args.source)
+    if args.continuous:
+        print(f"Streaming from {args.topic}; press Ctrl+C to stop. Spark UI: http://localhost:4040")
+        run_continuous(spark, lake, name, args.bootstrap, args.topic)
+        return 0
+    report = run_streaming(spark, lake, name, args.bootstrap, args.topic,
+                           max_offsets=args.max_offsets, reset=args.reset)
+    print(f"Processed everything in {args.topic} in {report['seconds']}s")
+    for key in ("bronze_records", "quarantined", "silver_events", "daily_windows", "daily_revenue"):
+        print(f"  {key:<22}{report[key]:,}")
+    for query, p in report["queries"].items():
+        print(f"  query {query:<10} batches {p['batches']:>4}  input rows {p['input_rows']:>8,}  "
+              f"dropped by watermark {p['dropped_by_watermark']:>6,}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="ecom_etl", description="E-commerce batch and streaming ETL")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -397,6 +436,26 @@ def build_parser() -> argparse.ArgumentParser:
     bm.add_argument("--repeat", type=int, default=1, help="runs per Spark config (median is reported)")
     bm.add_argument("--no-sql", action="store_true", help="skip the Postgres index benchmark")
     bm.set_defaults(func=_cmd_benchmark)
+
+    pr = sub.add_parser("produce", help="step 9: send order events to Kafka (with duplicates, late, malformed)")
+    pr.add_argument("--source", default="synthetic", help="synthetic, olist, or a folder path")
+    pr.add_argument("--topic", default="orders")
+    pr.add_argument("--bootstrap", default=config.KAFKA_BOOTSTRAP)
+    pr.add_argument("--limit", type=int, help="send only the first N events (event-time order)")
+    pr.add_argument("--rate", type=float, help="messages per second (default: as fast as possible)")
+    pr.add_argument("--duplicate-rate", type=float, default=0.02)
+    pr.add_argument("--late-rate", type=float, default=0.01)
+    pr.add_argument("--malformed-rate", type=float, default=0.01)
+    pr.set_defaults(func=_cmd_produce)
+
+    st = sub.add_parser("stream", help="step 9: Spark Structured Streaming from Kafka to lake + Postgres")
+    st.add_argument("--source", default="synthetic", help="names the lake folder and Postgres schema")
+    st.add_argument("--topic", default="orders")
+    st.add_argument("--bootstrap", default=config.KAFKA_BOOTSTRAP)
+    st.add_argument("--continuous", action="store_true", help="keep running (10 s micro-batches) until Ctrl+C")
+    st.add_argument("--max-offsets", type=int, help="max messages per micro-batch (default: all available)")
+    st.add_argument("--reset", action="store_true", help="delete checkpoints and outputs, start from the beginning")
+    st.set_defaults(func=_cmd_stream)
     return parser
 
 

@@ -40,9 +40,9 @@ def _spark_missing():
 def _kafka_missing():
     if importlib.util.find_spec("confluent_kafka") is None:
         return 'confluent-kafka not installed (pip install -e ".[streaming]")'
-    host, _, port = os.environ.get("ECOM_KAFKA_BOOTSTRAP", "localhost:19092").partition(":")
+    host, _, port = os.environ.get("ECOM_KAFKA_BOOTSTRAP", "localhost:9092").partition(":")
     if not _reachable(host, int(port or 9092)):
-        return "Kafka not reachable (docker compose up -d redpanda)"
+        return "Kafka not reachable (docker compose --profile streaming up -d kafka)"
     return None
 
 

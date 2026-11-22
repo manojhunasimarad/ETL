@@ -63,7 +63,7 @@ c2.metric("Orders", f"{int(kpi.orders or 0):,}")
 c3.metric("Average order value", f"{kpi.aov or 0:,.2f}")
 c4.metric("Late deliveries", f"{kpi.late_pct or 0:.1f}%")
 
-sales, delivery, customers, quality = st.tabs(["Sales", "Delivery", "Customers", "Data quality"])
+sales, delivery, customers, streaming, quality = st.tabs(["Sales", "Delivery", "Customers", "Streaming", "Data quality"])
 
 with sales:
     monthly = query(sql["q01_monthly_revenue_growth"])
@@ -96,6 +96,22 @@ with customers:
     st.dataframe(query(sql["q10_rfm_segments"]), hide_index=True)
     st.subheader("Revenue by customer state")
     st.bar_chart(query(sql["q03_revenue_by_state"]), x="customer_state", y="revenue")
+
+with streaming:
+    stream = schema_name(source, "stream")
+    has_stream = not query(f"SELECT 1 FROM information_schema.tables WHERE table_schema = '{stream}' "
+                           f"AND table_name = 'daily_revenue'").empty
+    if not has_stream:
+        st.info("No streaming output yet: `python -m ecom_etl produce`, then `python -m ecom_etl stream`.")
+    else:
+        daily = query(f"SELECT window_start::date AS day, orders, revenue, updated_at FROM {stream}.daily_revenue "
+                      "ORDER BY window_start")
+        a, b, c = st.columns(3)
+        a.metric("Days with events", f"{len(daily):,}")
+        b.metric("Orders (deduplicated)", f"{int(daily.orders.sum()):,}")
+        c.metric("Last update", str(daily.updated_at.max())[:19])
+        st.subheader("Revenue per day from the event stream")
+        st.line_chart(daily, x="day", y="revenue")
 
 with quality:
     has_dq = not query(f"SELECT 1 FROM information_schema.tables WHERE table_schema = '{dq}' "

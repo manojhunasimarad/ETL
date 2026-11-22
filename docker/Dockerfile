@@ -9,11 +9,15 @@ RUN apt-get update \
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
-RUN pip install --no-cache-dir -e ".[spark,postgres,dashboard]"
+RUN pip install --no-cache-dir -e ".[spark,postgres,dashboard,streaming]"
 COPY dashboard ./dashboard
 
 # Postgres JDBC driver baked in: runs need no internet access to Maven
 ADD https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.4/postgresql-42.7.4.jar /opt/jars/postgresql.jar
+
+# Fetch the Spark Kafka connector once at build time (Ivy cache), so streaming
+# jobs start without internet access
+RUN python -c "from ecom_etl.spark.session import get_spark; from ecom_etl.spark.streaming import kafka_package; get_spark('cache', packages=[kafka_package()]).stop()"
 
 ENV PYTHONUNBUFFERED=1 \
     ECOM_SPARK_DRIVER_MEMORY=2g \
