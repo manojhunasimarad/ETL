@@ -182,6 +182,33 @@ def _foreign_key_checks(frames: Dict[str, pd.DataFrame], findings: List[Finding]
                                         f"(e.g. {orphans.iloc[0]!r})"))
 
 
+def customers_without_orders(customers: pd.DataFrame, orders: pd.DataFrame) -> int:
+    """YOUR TURN (step 1).
+
+    Return how many distinct ``customer_id`` values in ``customers`` are not
+    used by any row in ``orders``.
+
+    This is a foreign-key check seen from the *parent* side. The ``fk:``
+    checks ask "does every order point to a customer that exists?"; this one
+    asks "does every customer have an order?". In Olist every customer_id is
+    created for exactly one order, so on real data the answer should be 0.
+    In synthetic data it equals the number of orders whose customer_id was
+    blanked (the ``null_customer_id`` defect).
+
+    The operation is called an *anti join*. You will meet it again in Spark
+    as ``customers.join(orders, "customer_id", "left_anti")`` in steps 3 and 5.
+
+    Hints:
+    * both arguments come from ``read_raw``: every value is text, empty values are NaN
+    * ``customers`` contains exact duplicate rows, so count each customer_id once
+    * ``orders["customer_id"]`` contains NaN values
+    * ``Series.isin``, ``Series.dropna`` and ``Series.nunique`` are all you need
+
+    Tests: ``tests/test_your_turn.py`` (they skip until this is implemented).
+    """
+    raise NotImplementedError("your turn: implement customers_without_orders in profiling.py (step 1)")
+
+
 def _order_checks(frames: Dict[str, pd.DataFrame], reference: datetime, findings: List[Finding]) -> None:
     orders = frames.get("orders")
     if orders is None:
@@ -200,6 +227,16 @@ def _order_checks(frames: Dict[str, pd.DataFrame], reference: datetime, findings
     if int(future.sum()):
         findings.append(Finding(ERROR, "orders", "future_timestamps", int(future.sum()),
                                 f"{int(future.sum())} orders have events after {reference:%Y-%m-%d %H:%M}"))
+
+    customers = frames.get("customers")
+    if customers is not None:
+        try:
+            unused = customers_without_orders(customers, orders)
+        except NotImplementedError:
+            unused = 0  # not implemented yet: see the YOUR TURN docstring
+        if unused:
+            findings.append(Finding(WARN, "customers", "customers_without_orders", int(unused),
+                                    f"{int(unused)} customers are not referenced by any order"))
 
     items, payments = frames.get("order_items"), frames.get("order_payments")
     order_ids = set(orders["order_id"].dropna())

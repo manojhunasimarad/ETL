@@ -188,7 +188,7 @@ The 14 injected defect types (see `DEFECT_SPECS` in `generator.py`):
 python -m venv .venv
 .venv\Scripts\Activate.ps1          # if blocked: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 pip install -e ".[dev]"
-pytest -q                           # 17 tests should pass
+pytest -q                           # 17 passed, 3 skipped (the skips are your turn)
 
 python -m ecom_etl generate         # 10,000 orders into data\raw\synthetic
 python -m ecom_etl profile          # report in reports\profile_synthetic.md
@@ -218,7 +218,32 @@ A sample report from the default synthetic run is in
 
 ---
 
-## 4. Exercises (do these before step 2)
+## 4. Your turn
+
+Implement `customers_without_orders` in
+[`profiling.py`](../../src/ecom_etl/profiling.py): how many distinct
+`customer_id` values in `customers` are never used by an order. The
+docstring explains the idea (an anti join) and gives hints; the tests in
+[`tests/test_your_turn.py`](../../tests/test_your_turn.py) skip until you
+implement it.
+
+```bash
+pytest -rs tests/test_your_turn.py     # 3 skipped: your task
+# implement the function, then:
+pytest -q                              # 20 passed
+python -m ecom_etl profile             # a new warn finding: customers_without_orders
+```
+
+Before coding, predict: what should the answer be on real Olist data, and
+why? What is it on synthetic data, and which defect causes it? Check your
+prediction after implementing.
+
+Commit it from your machine on this step's branch (see
+[`WORKFLOW.md`](../WORKFLOW.md)).
+
+---
+
+## 5. Exercises (do these before step 2)
 
 1. Open `reports/profile_synthetic.md`. For each finding, find the line
    in `generator.py` that caused it.
@@ -232,7 +257,7 @@ A sample report from the default synthetic run is in
 5. Time a bigger run: `python -m ecom_etl generate --orders 1000000`.
    Note the time and the folder size. We will need both in step 7.
 
-## 5. Check yourself (interview-style)
+## 6. Check yourself (interview-style)
 
 1. What is the grain of `order_items`? Why can't payments be stored as columns on it?
 2. What goes wrong if you count customers with `customer_id`?
@@ -245,7 +270,7 @@ A sample report from the default synthetic run is in
 
 ---
 
-## 6. Learning material for this step
+## 7. Learning material for this step
 
 **O'Reilly**
 - *Fundamentals of Data Engineering* (Joe Reis, Matt Housley, 2022):
@@ -272,11 +297,11 @@ A sample report from the default synthetic run is in
 
 ---
 
-## 7. Done when
+## 8. Done when
 
-- [ ] `pytest` passes on your machine
+- [ ] `pytest` passes on your machine with no "your turn" skips left (20 passed)
 - [ ] you have profiled both synthetic and real Olist data
-- [ ] you can answer the 8 questions above without looking
 - [ ] you have a fix/dedupe/quarantine/accept decision for each Olist finding
-
-Then send the Olist findings and your decisions, and we start step 2.
+- [ ] you can answer the 8 questions above without looking
+- [ ] quiz passed (say "quiz me on step 1")
+- [ ] your Step 1 story is in [`docs/STORIES.md`](../STORIES.md)
