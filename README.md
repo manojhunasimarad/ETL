@@ -19,9 +19,9 @@ See the [roadmap](docs/ROADMAP.md).
 
 | Step | Topic | Status |
 |---|---|---|
-| 1 | [Data sources and profiling](docs/steps/STEP-01-data-sources.md) | done |
-| 2 | Postgres landing zone and normalization | next |
-| 3 | Batch with PySpark: bronze to silver | |
+| 1 | [Data sources and profiling](docs/steps/STEP-01-data-sources.md) | **done** |
+| 2 | [Postgres landing zone and normalization](docs/steps/STEP-02-postgres.md) | **done** |
+| 3 | Batch with PySpark: bronze to silver | next |
 | 4 | Dimensional model (star schema, SCD Type 2) | |
 | 5 | Data quality framework | |
 | 6 | SQL analysis and dashboard | |
