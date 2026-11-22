@@ -2,7 +2,8 @@
 
 The schema is dropped and recreated on every load (full refresh), so a
 re-run gives the same result. Spark creates the tables; ``gold_constraints.sql``
-then adds primary keys, foreign keys and an analyst-friendly view.
+then adds primary keys, foreign keys and an analyst-friendly view, and
+``gold_indexes.sql`` adds the secondary indexes measured in step 7.
 """
 
 from __future__ import annotations
@@ -44,6 +45,7 @@ def load_gold(spark, lake: Lake, source: str, settings: Optional[DbSettings] = N
     counts = {}
     with connect(settings) as conn:
         conn.execute(read_sql("gold_constraints.sql", gold=schema))
+        conn.execute(read_sql("gold_indexes.sql", gold=schema))
         for table in GOLD_TABLES:
             counts[table] = conn.execute(f"SELECT count(*) FROM {schema}.{table}").fetchone()[0]
         conn.commit()

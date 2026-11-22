@@ -14,6 +14,7 @@ Commands:
   quality         (step 5) all data quality checks + report (+ history in Postgres)
   run             (step 5) the whole batch pipeline with quality gates
   analyze         (step 6) 10 business questions in SQL -> reports/analysis_<source>.md
+  benchmark       (step 7) baseline vs tuned Spark, partition pruning, Postgres indexes
 """
 
 from __future__ import annotations
@@ -291,6 +292,37 @@ def _cmd_analyze(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_benchmark(args: argparse.Namespace) -> int:
+    from .contracts import TIMESTAMP_FORMAT
+    from .spark.benchmark import machine_info, render_markdown, run_layout_benchmark, run_spark_benchmark
+    from .spark.bronze import run_bronze
+    from .spark.lake import new_run_id
+
+    name = _source_name(args.source)
+    spark, lake = _spark_and_lake(args.source, jdbc=not args.no_sql)
+    directory = config.source_dir(args.source)
+    extracted_at = _source_extracted_at(directory).strftime(TIMESTAMP_FORMAT)
+    run_id = new_run_id()
+    bronze = run_bronze(spark, directory, lake, run_id)
+    print(f"Bronze ready: {sum(bronze.values()):,} records. Benchmarking Spark configurations...")
+    report = {"source": name, "run_id": run_id, "machine": machine_info(spark), "bronze_rows": bronze,
+              "bronze_records": sum(bronze.values())}
+    report["spark"] = run_spark_benchmark(spark, lake, extracted_at, repeat=args.repeat)
+    report["layout"] = run_layout_benchmark(spark, lake)
+    if not args.no_sql:
+        from .spark.warehouse import load_gold
+        from .sql_tuning import run_sql_benchmark
+
+        load_gold(spark, lake, name)
+        report["sql"] = run_sql_benchmark(name)
+    lake.write_report(f"benchmark_{run_id}", report)
+    md = config.REPORTS_DIR / f"benchmark_{name}.md"
+    md.parent.mkdir(parents=True, exist_ok=True)
+    md.write_text(render_markdown(name, report), encoding="utf-8")
+    print(md.read_text(encoding="utf-8"))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="ecom_etl", description="E-commerce batch and streaming ETL")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -356,6 +388,12 @@ def build_parser() -> argparse.ArgumentParser:
     an = sub.add_parser("analyze", help="step 6: run the 10 business questions in SQL on <source>_gold")
     an.add_argument("--source", default="synthetic", help="synthetic, olist, or a folder path")
     an.set_defaults(func=_cmd_analyze)
+
+    bm = sub.add_parser("benchmark", help="step 7: Spark configs, data layout and Postgres indexes, measured")
+    bm.add_argument("--source", default="synthetic", help="synthetic, olist, or a folder path")
+    bm.add_argument("--repeat", type=int, default=1, help="runs per Spark config (median is reported)")
+    bm.add_argument("--no-sql", action="store_true", help="skip the Postgres index benchmark")
+    bm.set_defaults(func=_cmd_benchmark)
     return parser
 
 
