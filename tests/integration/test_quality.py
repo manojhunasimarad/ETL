@@ -50,10 +50,13 @@ def test_row_level_results_match_injected_defects(dirty_lake, dirty_source):
 
 
 def test_gates_pass_on_synthetic_data(spark, dirty_lake, dirty_source):
+    """The fixture injects every defect type at 2%; with cascades about 12% of
+    order lines are quarantined, which the default 10% gate rightly blocks.
+    (At the CLI default of 1% it is about 6%.) Allow 25% for this fixture."""
     _, manifest = dirty_source
     lake, silver, _ = dirty_lake
     results = row_level_results(silver)
-    results += silver_gate_results(spark, lake, silver, manifest["extracted_at"])
+    results += silver_gate_results(spark, lake, silver, manifest["extracted_at"], max_quarantine_rate=0.25)
     results += gold_gate_results(spark, lake)
     gate(results)  # must not raise
     fresh = next(r for r in results if r.name == "orders.freshness")
