@@ -9,6 +9,10 @@
 # Later runs reuse them. Everything printed is also written to
 # reports/gpu_setup.log, and the result to reports/gpu_benchmark_synthetic.md.
 #
+# Modes: PREPARE_ONLY=1 installs everything and generates the data, without
+# needing a working GPU (useful while a server waits for a reboot); SMOKE=1 runs
+# a 5,000-order check of the GPU path first, printing every operator left on the CPU.
+#
 # Settings (environment variables): ORDERS (default 200000), REPEAT (2),
 # INSTALL_CUDF=1 to also install cudf.pandas for `profile --gpu`, PYTHON (python3).
 # On a shared GPU server, also: CUDA_VISIBLE_DEVICES=<a free GPU>,
@@ -22,8 +26,15 @@ PY="${PYTHON:-python3}"   # on an old server: PYTHON=/path/to/python3.12 (or a c
 # Data on the Linux disk: Spark on /mnt/d (the Windows drive) is many times slower.
 export ECOM_ETL_DATA_DIR="${ECOM_ETL_DATA_DIR:-$HOME/ecom-data}"
 export ECOM_SPARK_DRIVER_MEMORY="${ECOM_SPARK_DRIVER_MEMORY:-2g}"
-ORDERS="${ORDERS:-200000}"
-REPEAT="${REPEAT:-2}"
+PREPARE_ONLY="${PREPARE_ONLY:-0}"
+SMOKE="${SMOKE:-0}"
+if [ "$SMOKE" = "1" ]; then
+    ORDERS="${ORDERS:-5000}"; REPEAT=1
+    export ECOM_RAPIDS_EXPLAIN=NOT_ON_GPU
+    export ECOM_ETL_DATA_DIR="$ECOM_ETL_DATA_DIR/smoke"   # leave the big data set alone
+else
+    ORDERS="${ORDERS:-200000}"; REPEAT="${REPEAT:-2}"
+fi
 mkdir -p "$REPO/reports"
 exec > >(tee "$REPO/reports/gpu_setup.log") 2>&1
 
@@ -31,11 +42,17 @@ step() { echo; echo "== $* ($(date '+%H:%M:%S'))"; }
 
 step "GPU"
 if ! nvidia-smi --query-gpu=name,compute_cap,memory.total,memory.used,driver_version --format=csv; then
-    echo "nvidia-smi does not work inside WSL. Update the NVIDIA driver on Windows;"
-    echo "do not install a Linux NVIDIA driver inside WSL."
-    exit 1
+    if [ "$PREPARE_ONLY" = "1" ]; then
+        echo "No working GPU right now; preparing everything else (PREPARE_ONLY=1)."
+    else
+        echo "nvidia-smi fails. In WSL: update the NVIDIA driver on Windows (never install one inside WSL)."
+        echo "On a server: a 'Driver/library version mismatch' needs a reboot by the administrator."
+        echo "Meanwhile PREPARE_ONLY=1 installs everything and generates the data."
+        exit 1
+    fi
 fi
 
+if [ "$PREPARE_ONLY" != "1" ]; then
 driver=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1 | cut -d. -f1)
 if [ "${driver:-0}" -lt 525 ]; then
     echo "The NVIDIA driver is ${driver}; the RAPIDS Accelerator needs 525 or newer (CUDA 12)."
@@ -46,6 +63,7 @@ gpu_free=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits | he
 if [ "${gpu_free:-0}" -lt 2000 ]; then
     echo "WARNING: only ${gpu_free} MiB of GPU memory is free; Windows apps (Chrome, Claude, video) use it too."
     echo "Close what you can; the plugin spills to host memory when the GPU fills, which is slower."
+fi
 fi
 
 step "Memory"
@@ -112,7 +130,26 @@ fi
 echo "jar verified: $JAR ($(du -h "$JAR" | cut -f1))"
 
 step "Data: $ORDERS synthetic orders in $ECOM_ETL_DATA_DIR"
-python -m ecom_etl generate --orders "$ORDERS"
+have=$(python -c "import json; from ecom_etl import config; m = config.source_dir('synthetic') / '_manifest.json'; print(json.loads(m.read_text())['config']['orders'] if m.exists() else 0)")
+if [ "$have" = "$ORDERS" ]; then
+    echo "already generated, reusing it"
+else
+    python -m ecom_etl generate --orders "$ORDERS"
+fi
+
+if [ "$PREPARE_ONLY" = "1" ]; then
+    step "Prepared"
+    echo "Everything is installed and the data is ready. When the GPU works, run this script again without PREPARE_ONLY."
+    exit 0
+fi
+
+if [ "$SMOKE" = "1" ]; then
+    step "Smoke test: the GPU path on $ORDERS orders (the plugin lists every operator left on the CPU)"
+    python -m ecom_etl gpu-benchmark --source synthetic --engines gpu --repeat 1 --no-warmup
+    step "Done"
+    echo "If that worked, run the full benchmark: bash scripts/gpu/run_gpu_benchmark.sh"
+    exit 0
+fi
 
 step "Benchmark: CPU, then GPU"
 python -m ecom_etl gpu-benchmark --source synthetic --repeat "$REPEAT"

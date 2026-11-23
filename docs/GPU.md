@@ -47,6 +47,9 @@ writes `reports\gpu_check.txt`.
 
 ## Run the benchmark
 
+Check the GPU path quickly first (5,000 orders, GPU only; the plugin prints
+every operator it left on the CPU and why): `SMOKE=1 bash scripts/gpu/run_gpu_benchmark.sh`.
+
 In WSL, from the repository (on Windows `D:\sem3_4\ETL` is `/mnt/d/sem3_4/ETL`):
 
 ```bash
@@ -100,11 +103,18 @@ Or let one PowerShell script do the SSH part from your laptop (it starts the
 run with `nohup`, so it keeps going after you disconnect):
 
 ```powershell
-.\scripts\gpu\run_on_server.ps1 -Server you@gpu-server -List     # free GPUs
-.\scripts\gpu\run_on_server.ps1 -Server you@gpu-server -Gpu 1    # start
-.\scripts\gpu\run_on_server.ps1 -Server you@gpu-server -Status   # progress
-.\scripts\gpu\run_on_server.ps1 -Server you@gpu-server -Fetch    # report into reports\server\
+.\scripts\gpu\run_on_server.ps1 -Server you@gpu-server -List           # free GPUs
+.\scripts\gpu\run_on_server.ps1 -Server you@gpu-server -Prepare        # install + data; works without a GPU
+.\scripts\gpu\run_on_server.ps1 -Server you@gpu-server -Gpu 1 -Smoke   # 2-minute check of the GPU path
+.\scripts\gpu\run_on_server.ps1 -Server you@gpu-server -Gpu 1          # the benchmark
+.\scripts\gpu\run_on_server.ps1 -Server you@gpu-server -Status         # progress
+.\scripts\gpu\run_on_server.ps1 -Server you@gpu-server -Fetch          # report into reports\server\
+.\scripts\gpu\run_on_server.ps1 -Server you@gpu-server -Diagnose       # why nvidia-smi fails
 ```
+
+`-Prepare` is for a server whose GPU is waiting for a reboot: everything that
+does not need the GPU (Java, the Python environment, the plugin jar, the
+data) is done in advance, so the benchmark starts straight away later.
 
 If the server's Python is older than 3.10, point the script at a newer one:
 `PYTHON=$HOME/miniconda3/envs/py312/bin/python bash scripts/gpu/run_gpu_benchmark.sh`.
