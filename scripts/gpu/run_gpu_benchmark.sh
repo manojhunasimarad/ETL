@@ -4,7 +4,7 @@
 # Run inside WSL2 Ubuntu, from the repository:
 #   cd /mnt/d/sem3_4/ETL && bash scripts/gpu/run_gpu_benchmark.sh
 #
-# The first run installs Java 17 (asks for your sudo password), a Python
+# The first run installs, without sudo, a Java 17 runtime (if missing), a Python
 # environment with PySpark 4.1.3 and the plugin jar: about 1.2 GB of downloads.
 # Later runs reuse them. Everything printed is also written to
 # reports/gpu_setup.log, and the result to reports/gpu_benchmark_synthetic.md.
@@ -32,6 +32,12 @@ if ! nvidia-smi --query-gpu=name,compute_cap,memory.total,memory.used,driver_ver
     exit 1
 fi
 
+gpu_free=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits | head -1 | tr -d ' ')
+if [ "${gpu_free:-0}" -lt 2000 ]; then
+    echo "WARNING: only ${gpu_free} MiB of GPU memory is free; Windows apps (Chrome, Claude, video) use it too."
+    echo "Close what you can; the plugin spills to host memory when the GPU fills, which is slower."
+fi
+
 step "Memory"
 free -h
 mem_gb=$(awk '/MemTotal/ {printf "%d", $2/1024/1024}' /proc/meminfo)
@@ -40,15 +46,31 @@ if [ "$mem_gb" -lt 4 ]; then
     echo "Give WSL more (docs/GPU.md, .wslconfig) and close Chrome while this runs."
 fi
 
-step "Java 17 and Python venv support"
-if ! command -v java >/dev/null || ! python3 -c "import ensurepip" 2>/dev/null; then
-    sudo apt-get update -y
-    sudo apt-get install -y openjdk-17-jre-headless python3-venv curl
+step "Java 17"
+# No sudo needed: if Java is missing, a Temurin 17 runtime goes into ~/.local/jdk-17.
+JDK="$HOME/.local/jdk-17"
+if ! command -v java >/dev/null; then
+    if [ ! -x "$JDK/bin/java" ]; then
+        mkdir -p "$JDK"
+        curl -fL --retry 3 "https://api.adoptium.net/v3/binary/latest/17/ga/linux/x64/jre/hotspot/normal/eclipse" \
+            | tar -xz -C "$JDK" --strip-components=1
+    fi
+    export JAVA_HOME="$JDK" PATH="$JDK/bin:$PATH"
 fi
 java -version 2>&1 | head -1
 
 step "Python environment in $VENV"
-[ -d "$VENV" ] || python3 -m venv "$VENV"
+if [ ! -x "$VENV/bin/python" ]; then
+    if python3 -c "import ensurepip" 2>/dev/null; then
+        python3 -m venv "$VENV"
+    else  # Ubuntu without python3-venv: create the venv bare, then bootstrap pip (no sudo)
+        python3 -m venv --without-pip "$VENV"
+        curl -fsSL https://bootstrap.pypa.io/get-pip.py | "$VENV/bin/python" - -q
+    fi
+    if [ -x "$JDK/bin/java" ]; then  # make `activate` also put this Java on the PATH
+        printf '\nexport JAVA_HOME="%s"\nexport PATH="$JAVA_HOME/bin:$PATH"\n' "$JDK" >> "$VENV/bin/activate"
+    fi
+fi
 # shellcheck disable=SC1091
 . "$VENV/bin/activate"
 pip install -q --upgrade pip
