@@ -6,6 +6,7 @@
 #   .\scripts\gpu\run_on_server.ps1 -Server you@gpu-server -Gpu 1     # start (keeps running after you disconnect)
 #   .\scripts\gpu\run_on_server.ps1 -Server you@gpu-server -Status    # progress
 #   .\scripts\gpu\run_on_server.ps1 -Server you@gpu-server -Fetch     # copy the report to reports\server\
+#   .\scripts\gpu\run_on_server.ps1 -Server you@gpu-server -Diagnose  # why nvidia-smi fails (to reports\server\)
 param(
     [Parameter(Mandatory = $true)][string]$Server,
     [int]$Gpu = 0,
@@ -14,7 +15,8 @@ param(
     [string]$DriverMemory = "16g",
     [switch]$List,
     [switch]$Status,
-    [switch]$Fetch
+    [switch]$Fetch,
+    [switch]$Diagnose
 )
 $ErrorActionPreference = "Stop"
 $repo = Resolve-Path (Join-Path $PSScriptRoot "..\..")
@@ -27,6 +29,24 @@ function Invoke-Remote([string]$script) {
 
 if ($List) {
     Invoke-Remote "nvidia-smi --query-gpu=index,name,memory.used,memory.total,utilization.gpu,driver_version --format=csv; nproc; free -g | head -2"
+    exit
+}
+if ($Diagnose) {
+    # Read-only checks: which NVIDIA kernel module is loaded, which is installed, which user-space libraries.
+    $dest = Join-Path $repo "reports\server"
+    New-Item -ItemType Directory -Force -Path $dest | Out-Null
+    $checks = @'
+echo '== kernel'; uname -r; cat /etc/os-release 2>/dev/null | head -2; uptime
+echo '== loaded kernel module'; cat /proc/driver/nvidia/version 2>&1
+echo '== module on disk for this kernel'; modinfo nvidia 2>&1 | grep -E '^(filename|version|vermagic)'
+echo '== dkms'; dkms status 2>&1
+echo '== user-space libraries'; ls -l /usr/lib/x86_64-linux-gnu/libnvidia-ml.so* /usr/lib64/libnvidia-ml.so* 2>&1
+echo '== packages'; (dpkg -l 2>/dev/null | grep -E 'nvidia-(driver|dkms|kernel|utils|compute)|libnvidia-(compute|gl)' | awk '{print $2, $3}') || rpm -qa 2>/dev/null | grep -i nvidia
+echo '== loaded modules'; lsmod | grep -i nvidia
+echo '== nvidia-smi'; nvidia-smi 2>&1 | head -5
+echo '== GPUs on the PCI bus'; lspci 2>/dev/null | grep -i nvidia
+'@
+    Invoke-Remote $checks | Tee-Object -FilePath (Join-Path $dest "diagnose.txt")
     exit
 }
 if ($Status) {
