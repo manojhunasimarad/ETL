@@ -75,6 +75,17 @@ def _cmd_validate(args: argparse.Namespace) -> int:
 
 
 def _cmd_profile(args: argparse.Namespace) -> int:
+    if args.gpu:  # cudf.pandas: pandas calls run on the GPU, falling back to pandas where needed
+        try:
+            import cudf.pandas
+        except ImportError:
+            print("--gpu needs cudf.pandas (Linux or WSL2 with an NVIDIA GPU): "
+                  "pip install --extra-index-url=https://pypi.nvidia.com cudf-cu12", file=sys.stderr)
+            return 1
+        if "pandas" in sys.modules:
+            print("pandas was imported before cudf.pandas could be installed", file=sys.stderr)
+            return 1
+        cudf.pandas.install()
     from .profiling import compare_with_manifest, profile_source, render_markdown
 
     directory = config.source_dir(args.source)
@@ -363,6 +374,43 @@ def _cmd_stream(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_gpu_benchmark(args: argparse.Namespace) -> int:
+    import json
+
+    from .contracts import TIMESTAMP_FORMAT
+    from .spark import gpu_benchmark as gb
+
+    name = _source_name(args.source)
+    directory = config.source_dir(args.source)
+    if not directory.exists():
+        print(f"{directory} does not exist. Run 'generate' or 'download-olist' first.", file=sys.stderr)
+        return 1
+    if args.worker:  # one engine, in this process (ECOM_GPU is set by the parent)
+        from .spark.lake import Lake
+        from .spark.session import get_spark
+
+        spark = get_spark(f"ecom_etl-{args.worker}-benchmark")
+        extracted_at = _source_extracted_at(directory).strftime(TIMESTAMP_FORMAT)
+        result = gb.run_engine(spark, directory, Lake.for_source(name), extracted_at, args.worker,
+                               repeat=args.repeat, warmup=not args.no_warmup)
+        Path(args.out).write_text(json.dumps(result, indent=2), encoding="utf-8")
+        return 0
+    engines = [e.strip() for e in args.engines.split(",") if e.strip()]
+    if any(e not in ("cpu", "gpu") for e in engines):
+        print("--engines takes cpu, gpu or cpu,gpu", file=sys.stderr)
+        return 2
+    config.REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    results = gb.run_workers(args.source, engines, args.repeat, not args.no_warmup, config.REPORTS_DIR)
+    summary = gb.compare(results)
+    records = next(iter(results.values()))["bronze_records"]
+    md = gb.render_markdown(name, records, results, summary)
+    (config.REPORTS_DIR / f"gpu_benchmark_{name}.json").write_text(
+        json.dumps({"results": results, "summary": summary}, indent=2), encoding="utf-8")
+    (config.REPORTS_DIR / f"gpu_benchmark_{name}.md").write_text(md, encoding="utf-8")
+    print(md)
+    return 0 if summary.get("same_result", True) else 1
+
+
 def _snowflake_target(args: argparse.Namespace):
     from .snowflake import Target
 
@@ -429,6 +477,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("profile", help="profile a source and write a markdown report")
     p.add_argument("--source", default="synthetic", help="synthetic, olist, or a folder path")
     p.add_argument("--report", help="report path (default reports/profile_<source>.md)")
+    p.add_argument("--gpu", action="store_true", help="run pandas on the GPU with cudf.pandas (Linux/WSL2)")
     p.set_defaults(func=_cmd_profile)
 
     lr = sub.add_parser("load-raw", help="step 2: copy the CSV files into Postgres <source>_raw")
@@ -497,6 +546,14 @@ def build_parser() -> argparse.ArgumentParser:
     st.add_argument("--reset", action="store_true", help="delete checkpoints and outputs, start from the beginning")
     st.set_defaults(func=_cmd_stream)
 
+    gb = sub.add_parser("gpu-benchmark", help="CPU against GPU (RAPIDS Accelerator) on the same data")
+    gb.add_argument("--source", default="synthetic", help="synthetic, olist, or a folder path")
+    gb.add_argument("--engines", default="cpu,gpu", help="cpu, gpu or cpu,gpu (default)")
+    gb.add_argument("--repeat", type=int, default=2, help="timed passes per engine (median is reported)")
+    gb.add_argument("--no-warmup", action="store_true", help="skip the untimed warm-up pass")
+    gb.add_argument("--worker", choices=["cpu", "gpu"], help=argparse.SUPPRESS)
+    gb.add_argument("--out", help=argparse.SUPPRESS)
+    gb.set_defaults(func=_cmd_gpu_benchmark)
     for name, helptext in (("export-snowflake", "step 10: write gold for Snowflake (Parquet + SQL script)"),
                            ("load-snowflake", "step 10: load the export into Snowflake (needs credentials)")):
         sf = sub.add_parser(name, help=helptext)

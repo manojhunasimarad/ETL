@@ -57,3 +57,19 @@ def test_export_for_snowflake_keeps_every_column(spark, dirty_lake, tmp_path):
     schema = pq.read_schema(files[0])
     stamps = [f for f in schema if str(f.type).startswith("timestamp")]
     assert stamps and all(f.type.unit == "us" for f in stamps), schema
+
+
+def test_gpu_benchmark_harness_on_cpu(spark, dirty_source, tmp_path):
+    """The benchmark harness, CPU engine (CI has no GPU): times, fingerprint, settings restored."""
+    from ecom_etl.spark.gold import GOLD_TABLES
+    from ecom_etl.spark.gpu_benchmark import run_engine
+    from ecom_etl.spark.lake import Lake
+
+    out, manifest = dirty_source
+    lake = Lake(tmp_path / "lake")
+    result = run_engine(spark, out, lake, manifest["extracted_at"], "cpu", repeat=1, warmup=False)
+    assert set(result["seconds"]) == {"bronze", "silver", "gold", "total"}
+    assert result["bronze_records"] > 0
+    fp = result["fingerprint"]
+    assert set(fp["gold_rows"]) == set(GOLD_TABLES) and fp["revenue"] > 0 and fp["quarantined"] > 0
+    assert "gpu" not in result

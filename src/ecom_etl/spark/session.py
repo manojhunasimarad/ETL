@@ -32,14 +32,19 @@ def get_spark(app_name: str = "ecom_etl", conf: Optional[Dict[str, str]] = None,
     downloaded at start-up (e.g. the Kafka connector in step 9).
     ``ECOM_SPARK_JARS`` lists local jar files (the Docker image bakes the
     Postgres JDBC driver in, so runs do not need internet access).
+    ``ECOM_GPU=1`` adds the NVIDIA RAPIDS Accelerator, so the job runs on the GPU.
     """
     from pyspark.sql import SparkSession
+
+    from .gpu import add_rapids, gpu_requested
 
     settings = dict(DEFAULTS)
     jars = os.environ.get("ECOM_SPARK_JARS")
     if jars:
         settings["spark.jars"] = jars
     packages = list(packages)
+    if gpu_requested():  # ECOM_GPU=1: the RAPIDS Accelerator (see gpu.py)
+        add_rapids(settings, packages)
     if packages:
         settings["spark.jars.packages"] = ",".join(packages)
     settings.update(conf or {})

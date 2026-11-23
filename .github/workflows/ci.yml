@@ -62,6 +62,7 @@ jobs:
           python -m ecom_etl produce --source synthetic --limit 3000
           python -m ecom_etl stream --source synthetic --reset
           python -m ecom_etl export-snowflake --source synthetic
+          python -m ecom_etl gpu-benchmark --source synthetic --engines cpu --repeat 1 --no-warmup
           head -40 reports/snowflake_synthetic.sql
           ECOM_NO_CACHE=1 python -c "from ecom_etl.spark.session import get_spark; from ecom_etl.spark.databricks import run_batch; import json; r = run_batch(get_spark('databricks-path'), 'data/databricks', orders=20000); print(json.dumps({k: r[k] for k in ('status', 'bronze_records', 'gold_rows', 'seconds')}, indent=1))"
 

@@ -1,0 +1,98 @@
+# Running the batch on a GPU
+
+The Spark batch (bronze, silver, gold) can run on an NVIDIA GPU with the
+**RAPIDS Accelerator for Apache Spark**, NVIDIA's Spark plugin. The DataFrame
+code does not change: with `ECOM_GPU=1`, Spark starts with the plugin, which
+replaces plan operators (CSV and Parquet scans and writes, filters,
+projections, joins, aggregations, sorts, windows) with GPU versions and leaves
+the rest on the CPU.
+
+## Where a GPU helps here, and where it does not
+
+| Part | GPU? | Why |
+|---|---|---|
+| Spark bronze, silver, gold | **yes**, at scale | columnar work on many rows; needs enough data to outweigh copying it to the GPU |
+| Profiling (pandas) | a little | `profile --gpu` runs pandas through `cudf.pandas` |
+| Postgres load and queries | no | database and network bound |
+| Kafka stream | no | small micro-batches, latency bound |
+| Airflow, dashboard | no | scheduling and display |
+| Synthetic generator | no | plain Python |
+
+The honest expectation on a laptop: a GPU with 4 GB of memory, sharing the
+machine's RAM with Windows, may beat 12 CPU threads only modestly, or not at
+all at small sizes. The benchmark measures it rather than assuming it, and
+checks that both engines produce the same data.
+
+## Requirements
+
+- Linux; on Windows, **WSL2** (Ubuntu). The plugin does not run on Windows itself.
+- An NVIDIA GPU of the Volta generation or newer (compute capability 7.0+):
+  GTX 16xx, RTX 20xx and later. A GTX 10xx (Pascal) is too old.
+- The Windows NVIDIA driver R525 or newer. Inside WSL, `nvidia-smi` works
+  through the Windows driver; never install a Linux driver in WSL.
+- A Spark version the plugin supports: the GPU environment pins PySpark 4.1.3.
+- RAM: about 4 GB for WSL. WSL takes half of the machine's memory by default;
+  with 8 GB in total, give it more in `C:\Users\<you>\.wslconfig`:
+
+  ```ini
+  [wsl2]
+  memory=5GB
+  swap=8GB
+  ```
+
+  then `wsl --shutdown` in PowerShell, and close Chrome while benchmarking.
+
+To check a machine: `powershell -ExecutionPolicy Bypass -File scripts\gpu\check_gpu.ps1`
+writes `reports\gpu_check.txt`.
+
+## Run the benchmark
+
+In WSL, from the repository (on Windows `D:\sem3_4\ETL` is `/mnt/d/sem3_4/ETL`):
+
+```bash
+cd /mnt/d/sem3_4/ETL
+bash scripts/gpu/run_gpu_benchmark.sh               # 200,000 orders, 2 timed passes per engine
+ORDERS=500000 bash scripts/gpu/run_gpu_benchmark.sh # bigger, if memory allows
+```
+
+The first run installs Java 17, a virtual environment in `~/.venvs/ecom-gpu`
+with PySpark 4.1.3, and the plugin jar (checksum verified), about 1.2 GB.
+Data goes to `~/ecom-data` on the Linux disk, because Spark on `/mnt/d` is
+many times slower. The report is `reports/gpu_benchmark_synthetic.md`:
+
+- median seconds per stage for each engine and the speed-up;
+- whether both engines produced the same gold row counts, quarantine count
+  and revenue totals;
+- how many plan operators ran on the GPU, and which stayed on the CPU
+  (`ECOM_RAPIDS_EXPLAIN=NOT_ON_GPU` prints why, operator by operator).
+
+Each engine runs in its own process, because the plugin is loaded when the JVM
+starts. Both use the tuned settings of step 7.
+
+## Use it for anything else
+
+```bash
+. ~/.venvs/ecom-gpu/bin/activate
+export ECOM_ETL_DATA_DIR=~/ecom-data ECOM_GPU=1
+python -m ecom_etl run --source synthetic --no-load
+```
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `ECOM_GPU` | off | `1` loads the RAPIDS Accelerator |
+| `ECOM_RAPIDS_JAR` | `~/.cache/ecom-etl/rapids-4-spark_2.13-26.10.0.jar` if present, else Maven | plugin jar |
+| `ECOM_RAPIDS_CONCURRENT_TASKS` | `1` | tasks sharing the GPU at once (2 with 8 GB of GPU memory or more) |
+| `ECOM_RAPIDS_BATCH_BYTES` | `256m` | GPU batch size, kept small for a 4 GB GPU |
+| `ECOM_RAPIDS_PINNED_POOL` | unset | pinned host memory; WSL2 limits it |
+| `ECOM_RAPIDS_EXPLAIN` | `NONE` | `NOT_ON_GPU` prints every CPU fallback |
+
+## Profiling with cudf.pandas
+
+`INSTALL_CUDF=1 bash scripts/gpu/run_gpu_benchmark.sh` also installs cuDF.
+Then `python -m ecom_etl profile --gpu` runs the profiler's pandas code on the
+GPU; compare its time with `profile` without `--gpu`.
+
+## Learn more
+
+- NVIDIA, *RAPIDS Accelerator for Apache Spark* documentation: getting started, supported operators, tuning guide.
+- *Learning Spark, 2nd Ed.*, ch. 7, for what the plan operators are.

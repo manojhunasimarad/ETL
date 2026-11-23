@@ -121,6 +121,10 @@ python -m ecom_etl --help
 Real Olist data: `pip install -e ".[kaggle]"`, then
 `python -m ecom_etl download-olist` and `--source olist` in any command.
 
+GPU: the Spark batch also runs on an NVIDIA GPU with the RAPIDS Accelerator
+(`ECOM_GPU=1`; WSL2 on Windows); see [`docs/GPU.md`](docs/GPU.md) and
+`python -m ecom_etl gpu-benchmark`.
+
 Cloud: [`cloud/databricks/`](cloud/databricks/README.md) (notebook for
 Databricks Free Edition) and [`cloud/snowflake/`](cloud/snowflake/README.md)
 (`export-snowflake`, `load-snowflake`).
