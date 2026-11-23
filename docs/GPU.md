@@ -96,6 +96,16 @@ laptop from PowerShell:
 scp you@gpu-server:ETL/reports/gpu_benchmark_synthetic.md D:\sem3_4\ETL\reports\
 ```
 
+Or let one PowerShell script do the SSH part from your laptop (it starts the
+run with `nohup`, so it keeps going after you disconnect):
+
+```powershell
+.\scripts\gpu\run_on_server.ps1 -Server you@gpu-server -List     # free GPUs
+.\scripts\gpu\run_on_server.ps1 -Server you@gpu-server -Gpu 1    # start
+.\scripts\gpu\run_on_server.ps1 -Server you@gpu-server -Status   # progress
+.\scripts\gpu\run_on_server.ps1 -Server you@gpu-server -Fetch    # report into reports\server\
+```
+
 If the server's Python is older than 3.10, point the script at a newer one:
 `PYTHON=$HOME/miniconda3/envs/py312/bin/python bash scripts/gpu/run_gpu_benchmark.sh`.
 
