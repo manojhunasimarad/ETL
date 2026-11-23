@@ -119,6 +119,24 @@ data) is done in advance, so the benchmark starts straight away later.
 If the server's Python is older than 3.10, point the script at a newer one:
 `PYTHON=$HOME/miniconda3/envs/py312/bin/python bash scripts/gpu/run_gpu_benchmark.sh`.
 
+## Measured so far
+
+| Machine | What | Result |
+|---|---|---|
+| Laptop: i7-10750H (12 threads), 8 GB RAM, WSL2 | CPU, 200,000 orders (915,177 bronze records), tuned settings | 90.3 s per pass (bronze 8.2, silver 64.2, gold 17.8) |
+| same, GTX 1650 4 GB | GPU, 200,000 orders | stalled: WSL had about 5 GB of RAM, and the plugin wants 4 GB of host memory on top of Spark's 2 GB |
+| same, GTX 1650 4 GB | GPU smoke test, 5,000 orders, no warm-up | completed; 93% of plan operators on the GPU. 135.8 s: start-up and per-query overheads dominate at this size, so it says nothing about speed |
+| College V100 32 GB | CPU against GPU, 1,000,000 orders | waiting for the server's driver fix (a reboot) |
+
+The smoke test showed what stays on the CPU and why (`ECOM_RAPIDS_EXPLAIN=NOT_ON_GPU`):
+
+- **reading the CSV files**: the files need `escape='"'` (RFC 4180 quoting) and the
+  `_metadata` file column for lineage, which the GPU CSV reader does not support. It is
+  seven scans; everything after them runs on the GPU. Kept on purpose: correct parsing first.
+- **scans of cached DataFrames**: fixed by `spark.sql.cache.serializer=com.nvidia.spark.ParquetCachedBatchSerializer`,
+  now part of the GPU settings.
+- **adaptive execution's wrappers** (`TableCacheQueryStage`, `EmptyRelation`): placeholders, not work, and left out of the count.
+
 ## Use it for anything else
 
 ```bash

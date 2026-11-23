@@ -21,6 +21,11 @@ Where a GPU helps in this project, and where it does not:
   Airflow (scheduling), the Kafka stream (small micro-batches, latency bound),
   the generator (pure Python) and the dashboard.
 
+What stays on the CPU by design: reading the source CSV files. They need
+``escape='"'`` (RFC 4180 quoting) and the ``_metadata`` file column for lineage,
+which the GPU CSV reader does not support; everything after the read runs on
+the GPU.
+
 Requirements (RAPIDS Accelerator 26.10): Linux (on Windows: WSL2), an NVIDIA
 GPU of the Volta generation or newer (compute capability 7.0+, so RTX 20xx,
 GTX 16xx and later), driver R525+ (CUDA 12), and a supported Spark version.
@@ -100,6 +105,9 @@ def rapids_conf(concurrent_tasks: Optional[int] = None) -> Dict[str, str]:
         "spark.rapids.sql.batchSizeBytes": os.environ.get("ECOM_RAPIDS_BATCH_BYTES", "256m"),
         "spark.sql.files.maxPartitionBytes": "256m",
         "spark.locality.wait": "0s",
+        # Cached DataFrames (silver and gold persist a few) in a GPU-readable format; with
+        # Spark's default serializer every scan of the cache falls back to the CPU.
+        "spark.sql.cache.serializer": "com.nvidia.spark.ParquetCachedBatchSerializer",
     }
     if os.environ.get("ECOM_RAPIDS_PINNED_POOL"):
         conf["spark.rapids.memory.pinnedPool.size"] = os.environ["ECOM_RAPIDS_PINNED_POOL"]
@@ -142,7 +150,9 @@ _STRUCTURAL = ("WholeStageCodegen", "InputAdapter", "AdaptiveSparkPlan", "Result
                "BroadcastQueryStage", "TableCacheQueryStage", "AQEShuffleRead", "GpuShuffleCoalesce", "ReusedExchange",
                "Subquery", "SubqueryBroadcast", "ReusedSubquery", "ColumnarToRow", "RowToColumnar",
                "GpuColumnarToRow", "GpuRowToColumnar", "GpuCoalesceBatches", "CustomShuffleReader",
-               "GpuBringBackToHost", "GpuColumnarExchange", "LocalTableScan", "CommandResult")
+               "GpuBringBackToHost", "GpuColumnarExchange", "LocalTableScan", "CommandResult",
+               # adaptive execution's placeholders, e.g. for a join side it found empty
+               "LogicalQueryStage", "EmptyRelation")
 
 
 def operator_share(node_names: Iterable[str]) -> dict:

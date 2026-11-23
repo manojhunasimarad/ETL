@@ -26,6 +26,7 @@ def test_rapids_conf_defaults_and_overrides(monkeypatch):
     assert conf["spark.rapids.sql.concurrentGpuTasks"] == "1"
     assert conf["spark.rapids.sql.batchSizeBytes"] == "256m"
     assert "spark.rapids.memory.pinnedPool.size" not in conf   # WSL2 limits pinned memory
+    assert conf["spark.sql.cache.serializer"] == "com.nvidia.spark.ParquetCachedBatchSerializer"
     monkeypatch.setenv("ECOM_RAPIDS_CONCURRENT_TASKS", "2")
     monkeypatch.setenv("ECOM_RAPIDS_PINNED_POOL", "256m")
     conf = gpu.rapids_conf()
@@ -66,7 +67,8 @@ def test_unsupported_spark_is_refused_before_starting(monkeypatch):
 def test_operator_share_counts_work_not_wrappers():
     names = ["AdaptiveSparkPlan", "WholeStageCodegen (1)", "GpuScan parquet ", "GpuFilter", "GpuProject",
              "GpuHashAggregate", "GpuColumnarToRow", "HashAggregate", "Execute GpuInsertIntoHadoopFsRelationCommand",
-             "Window", "Window", "InputAdapter", "ShuffleQueryStage", "GpuShuffleCoalesce"]
+             "Window", "Window", "InputAdapter", "ShuffleQueryStage", "GpuShuffleCoalesce",
+             "EmptyRelation", "LogicalQueryStage"]
     share = gpu.operator_share(names)
     assert share["gpu_operators"] == 5 and share["cpu_operators"] == 3
     assert share["gpu_share"] == round(5 / 8, 3)

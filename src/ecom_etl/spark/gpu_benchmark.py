@@ -85,7 +85,7 @@ def _timed(spark, source_dir, lake, extracted_at, engine, repeat, warmup, tuned)
     seconds = {s: statistics.median(v) for s, v in timings.items()}
     seconds["total"] = round(sum(seconds.values()), 2)
     result = {"engine": engine, "bronze_records": sum(bronze_rows.values()), "seconds": seconds, "runs": timings,
-              "settings": tuned.conf,
+              "warmup": warmup, "repeat": max(1, repeat), "settings": tuned.conf,
               "machine": machine_info(spark), "fingerprint": fingerprint(spark, lake)}
     if engine == "gpu":
         from .gpu import executed_plan_nodes, gpu_info, operator_share
@@ -112,6 +112,14 @@ def compare(results: Dict[str, dict]) -> dict:
     return summary
 
 
+def timing_note(result: dict) -> str:
+    n = result.get("repeat", 1)
+    passes = f"{n} timed pass" + ("es" if n > 1 else "")
+    when = ("after a warm-up pass" if result.get("warmup", True)
+            else "without a warm-up pass, so start-up costs are included")
+    return f"Median seconds per stage over {passes}, {when}:"
+
+
 def render_markdown(source: str, bronze_records: int, results: Dict[str, dict], summary: dict) -> str:
     lines = [f"# CPU and GPU: `{source}` ({bronze_records:,} bronze records)", ""]
     any_result = next(iter(results.values()))
@@ -121,7 +129,7 @@ def render_markdown(source: str, bronze_records: int, results: Dict[str, dict], 
         g = results["gpu"]["gpu"]
         lines += [f"GPU: {g['name']}, {g['memory']}, driver {g['driver']}, compute capability {g['compute_capability']}."]
     lines += ["Settings: " + ", ".join(f"`{k}={v}`" for k, v in any_result["settings"].items()) + ".", "",
-              "Median seconds per stage, after a warm-up pass:", "",
+              timing_note(any_result), "",
               "| stage | " + " | ".join(results) + (" | speed-up |" if "speedup" in summary else " |"),
               "|---|" + "---:|" * (len(results) + ("speedup" in summary))]
     for stage in (*STAGES, "total"):
