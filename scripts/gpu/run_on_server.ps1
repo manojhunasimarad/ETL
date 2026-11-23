@@ -20,7 +20,8 @@ $ErrorActionPreference = "Stop"
 $repo = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 
 function Invoke-Remote([string]$script) {
-    # Windows line endings would break bash on the server
+    # Windows line endings would break bash on the server. The remote scripts use only
+    # single quotes: Windows PowerShell 5.1 drops double quotes inside native arguments.
     ssh $Server ($script -replace "`r", "")
 }
 
@@ -45,7 +46,7 @@ set -e
 if [ -d ETL/.git ]; then git -C ETL pull -q; else git clone -q https://github.com/manojhunasimarad/ETL.git; fi
 cd ETL && mkdir -p reports
 nohup env CUDA_VISIBLE_DEVICES=$Gpu ORDERS=$Orders ECOM_SPARK_MASTER='local[$Cores]' ECOM_SPARK_DRIVER_MEMORY=$DriverMemory ECOM_RAPIDS_CONCURRENT_TASKS=2 ECOM_RAPIDS_BATCH_BYTES=1g bash scripts/gpu/run_gpu_benchmark.sh > reports/server_run.out 2>&1 < /dev/null &
-echo "Started on GPU $Gpu with $Orders orders. It keeps running if you disconnect."
+echo 'Started on GPU $Gpu with $Orders orders. It keeps running if you disconnect.'
 "@
 Invoke-Remote $start
 Write-Host "Check progress:  .\scripts\gpu\run_on_server.ps1 -Server $Server -Status"
