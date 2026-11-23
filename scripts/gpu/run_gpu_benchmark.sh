@@ -10,11 +10,15 @@
 # reports/gpu_setup.log, and the result to reports/gpu_benchmark_synthetic.md.
 #
 # Settings (environment variables): ORDERS (default 200000), REPEAT (2),
-# INSTALL_CUDF=1 to also install cudf.pandas for `profile --gpu`.
+# INSTALL_CUDF=1 to also install cudf.pandas for `profile --gpu`, PYTHON (python3).
+# On a shared GPU server, also: CUDA_VISIBLE_DEVICES=<a free GPU>,
+# ECOM_SPARK_MASTER=local[8] (leave cores for others), ECOM_SPARK_DRIVER_MEMORY=16g,
+# ECOM_RAPIDS_CONCURRENT_TASKS=2 and ECOM_RAPIDS_BATCH_BYTES=1g on a 16-32 GB GPU.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 VENV="${ECOM_GPU_VENV:-$HOME/.venvs/ecom-gpu}"
+PY="${PYTHON:-python3}"   # on an old server: PYTHON=/path/to/python3.12 (or a conda env's python)
 # Data on the Linux disk: Spark on /mnt/d (the Windows drive) is many times slower.
 export ECOM_ETL_DATA_DIR="${ECOM_ETL_DATA_DIR:-$HOME/ecom-data}"
 export ECOM_SPARK_DRIVER_MEMORY="${ECOM_SPARK_DRIVER_MEMORY:-2g}"
@@ -32,6 +36,12 @@ if ! nvidia-smi --query-gpu=name,compute_cap,memory.total,memory.used,driver_ver
     exit 1
 fi
 
+driver=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1 | cut -d. -f1)
+if [ "${driver:-0}" -lt 525 ]; then
+    echo "The NVIDIA driver is ${driver}; the RAPIDS Accelerator needs 525 or newer (CUDA 12)."
+    echo "On a shared server, ask the administrator; the CPU run would still work (--engines cpu)."
+    exit 1
+fi
 gpu_free=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits | head -1 | tr -d ' ')
 if [ "${gpu_free:-0}" -lt 2000 ]; then
     echo "WARNING: only ${gpu_free} MiB of GPU memory is free; Windows apps (Chrome, Claude, video) use it too."
@@ -60,11 +70,16 @@ fi
 java -version 2>&1 | head -1
 
 step "Python environment in $VENV"
+if ! "$PY" -c "import sys; sys.exit(sys.version_info < (3, 10))"; then
+    echo "$PY is $("$PY" --version 2>&1); PySpark 4 needs Python 3.10 or newer."
+    echo "Point PYTHON at a newer one, for example a conda env: conda create -n py312 python=3.12"
+    exit 1
+fi
 if [ ! -x "$VENV/bin/python" ]; then
-    if python3 -c "import ensurepip" 2>/dev/null; then
-        python3 -m venv "$VENV"
+    if "$PY" -c "import ensurepip" 2>/dev/null; then
+        "$PY" -m venv "$VENV"
     else  # Ubuntu without python3-venv: create the venv bare, then bootstrap pip (no sudo)
-        python3 -m venv --without-pip "$VENV"
+        "$PY" -m venv --without-pip "$VENV"
         curl -fsSL https://bootstrap.pypa.io/get-pip.py | "$VENV/bin/python" - -q
     fi
     if [ -x "$JDK/bin/java" ]; then  # make `activate` also put this Java on the PATH

@@ -69,6 +69,36 @@ many times slower. The report is `reports/gpu_benchmark_synthetic.md`:
 Each engine runs in its own process, because the plugin is loaded when the JVM
 starts. Both use the tuned settings of step 7.
 
+## On a shared GPU server (over SSH)
+
+A server GPU such as a V100 (16 or 32 GB) has room for much larger runs. The
+same script works there without sudo: it downloads a Java runtime and builds
+its own Python environment in your home folder. It needs Linux, the NVIDIA
+driver 525 or newer, Python 3.10+ and internet access for the downloads.
+
+```bash
+ssh you@gpu-server                       # after the college VPN, if needed
+tmux new -s etl                          # keeps running if the connection drops
+git clone https://github.com/manojhunasimarad/ETL.git && cd ETL   # later: git pull
+nvidia-smi                               # pick a GPU nobody is using
+export CUDA_VISIBLE_DEVICES=0            # that GPU's index
+ORDERS=1000000 ECOM_SPARK_MASTER='local[8]' ECOM_SPARK_DRIVER_MEMORY=16g \
+ECOM_RAPIDS_CONCURRENT_TASKS=2 ECOM_RAPIDS_BATCH_BYTES=1g \
+bash scripts/gpu/run_gpu_benchmark.sh
+```
+
+`local[8]` limits Spark to 8 cores so others can use the machine; both
+engines get the same cores, so the comparison stays fair. Detach from tmux
+with Ctrl+B then D; `tmux attach -t etl` returns. Copy the report to your
+laptop from PowerShell:
+
+```powershell
+scp you@gpu-server:ETL/reports/gpu_benchmark_synthetic.md D:\sem3_4\ETL\reports\
+```
+
+If the server's Python is older than 3.10, point the script at a newer one:
+`PYTHON=$HOME/miniconda3/envs/py312/bin/python bash scripts/gpu/run_gpu_benchmark.sh`.
+
 ## Use it for anything else
 
 ```bash
