@@ -63,7 +63,8 @@ c2.metric("Orders", f"{int(kpi.orders or 0):,}")
 c3.metric("Average order value", f"{kpi.aov or 0:,.2f}")
 c4.metric("Late deliveries", f"{kpi.late_pct or 0:.1f}%")
 
-sales, delivery, customers, streaming, quality = st.tabs(["Sales", "Delivery", "Customers", "Streaming", "Data quality"])
+sales, delivery, customers, streaming, quality, ask_tab = st.tabs(
+    ["Sales", "Delivery", "Customers", "Streaming", "Data quality", "Ask"])
 
 with sales:
     monthly = query(sql["q01_monthly_revenue_growth"])
@@ -141,3 +142,43 @@ with quality:
             hide_index=True)
         st.subheader("Run history")
         st.dataframe(runs, hide_index=True)
+
+with ask_tab:
+    from ecom_etl.ask import api_key, ask_warehouse
+
+    st.subheader("Ask the warehouse")
+    st.caption("Gemini sees the table descriptions and your question, never the data. Its SQL runs here, "
+               "read-only, as the ecom_reader role, with a time limit and a row cap.")
+    try:
+        api_key()
+        has_key = True
+    except RuntimeError:
+        has_key = False
+        st.info("Add GEMINI_API_KEY=... to the .env file at the root of the repository (git-ignored) "
+                "and restart the dashboard. Keys come from Google AI Studio.")
+    with st.form("ask"):
+        question = st.text_input("Question", placeholder="Which 5 states had the most late deliveries in 2018?")
+        asked = st.form_submit_button("Ask", disabled=not has_key)
+    if asked and question.strip():
+        with st.spinner("Asking Gemini, then running the SQL..."):
+            try:
+                answer = ask_warehouse(question.strip(), source)
+            except Exception as e:  # the API or the database: show it, do not crash the page
+                st.error(str(e))
+                answer = None
+        if answer is not None:
+            if answer.explanation:
+                st.write(answer.explanation)
+            if answer.sql:
+                st.code(answer.sql, language="sql")
+            if answer.error:
+                st.error(f"Not answered: {answer.error}")
+            elif answer.ok:
+                frame = pd.DataFrame(answer.rows, columns=answer.columns)
+                for col in frame.columns:
+                    if frame[col].map(lambda v: isinstance(v, Decimal)).any():
+                        frame[col] = frame[col].astype(float)
+                st.dataframe(frame, hide_index=True)
+                st.caption(f"{len(answer.rows)} rows{' (row cap reached)' if answer.truncated else ''} "
+                           f"in {answer.seconds:.1f}s, {answer.model}, {answer.tokens} tokens, "
+                           f"attempt {answer.attempts}. Logged to reports/ask_history.jsonl.")

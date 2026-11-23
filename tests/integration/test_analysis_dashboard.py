@@ -54,3 +54,4 @@ def test_dashboard_renders(loaded, monkeypatch):
     assert not app.exception, app.exception
     assert len(app.metric) >= 4
     assert any(loaded in t.value for t in app.title)
+    assert [t.label for t in app.tabs][-1] == "Ask"   # without a key it explains where to put one

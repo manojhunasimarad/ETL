@@ -411,6 +411,64 @@ def _cmd_gpu_benchmark(args: argparse.Namespace) -> int:
     return 0 if summary.get("same_result", True) else 1
 
 
+def _print_rows(columns, rows, limit: int = 20) -> None:
+    from decimal import Decimal
+
+    def cell(v):
+        return f"{float(v):,.2f}" if isinstance(v, (float, Decimal)) else str(v)
+
+    shown = [[cell(v) for v in r] for r in rows[:limit]]
+    widths = [max([len(c)] + [len(r[i]) for r in shown]) for i, c in enumerate(columns)]
+    print("  " + "  ".join(c.ljust(w) for c, w in zip(columns, widths)))
+    for r in shown:
+        print("  " + "  ".join(v.ljust(w) for v, w in zip(r, widths)))
+    if len(rows) > limit:
+        print(f"  ... {len(rows) - limit} more rows")
+
+
+def _cmd_ask(args: argparse.Namespace) -> int:
+    from .ask import ask_warehouse
+
+    answer = ask_warehouse(args.question, _source_name(args.source))
+    print(f"\n{answer.explanation}\n")
+    if answer.sql:
+        print("SQL (" + ("ran" if answer.ok else "failed") + f", attempt {answer.attempts}):")
+        print("  " + answer.sql.replace("\n", "\n  ") + "\n")
+    if answer.error:
+        print(f"Not answered: {answer.error}", file=sys.stderr)
+        return 1
+    if answer.ok:
+        _print_rows(answer.columns, answer.rows)
+        more = " (row cap reached)" if answer.truncated else ""
+        print(f"\n{len(answer.rows)} rows{more} in {answer.seconds:.1f}s, {answer.model}, {answer.tokens} tokens")
+    return 0
+
+
+def _cmd_ask_eval(args: argparse.Namespace) -> int:
+    import json
+
+    from .ask import evaluate
+
+    name = _source_name(args.source)
+    results = evaluate(name, pause=args.pause)
+    matched = sum(r["match"] for r in results)
+    lines = [f"# Ask-your-data evaluation: `{name}`", "",
+             "Each question of step 6 is asked in plain English; Gemini's SQL result is compared with",
+             "the hand-written SQL's (same rows, and every hand-written column found among Gemini's).", "",
+             "| question | ran | matches | attempts | seconds | tokens |", "|---|---|---|---:|---:|---:|"]
+    for r in results:
+        lines.append(f"| {r['question']} | {'yes' if r['ok'] else 'no'} | {'yes' if r['match'] else 'no'} "
+                     f"| {r['attempts']} | {r['seconds']:.1f} | {r['tokens']} |")
+    lines += ["", f"**{matched} of {len(results)}** answers match the hand-written SQL."]
+    md = "\n".join(lines) + "\n"
+    config.REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    (config.REPORTS_DIR / f"ask_eval_{name}.md").write_text(md, encoding="utf-8")
+    (config.REPORTS_DIR / f"ask_eval_{name}.json").write_text(json.dumps(results, indent=2, default=str),
+                                                             encoding="utf-8")
+    print(md)
+    return 0
+
+
 def _snowflake_target(args: argparse.Namespace):
     from .snowflake import Target
 
@@ -546,6 +604,14 @@ def build_parser() -> argparse.ArgumentParser:
     st.add_argument("--reset", action="store_true", help="delete checkpoints and outputs, start from the beginning")
     st.set_defaults(func=_cmd_stream)
 
+    ak = sub.add_parser("ask", help="ask the warehouse in plain English (Gemini writes the SQL)")
+    ak.add_argument("question")
+    ak.add_argument("--source", default="synthetic", help="synthetic, olist, or a folder path")
+    ak.set_defaults(func=_cmd_ask)
+    ae = sub.add_parser("ask-eval", help="compare Gemini's answers with the step-6 SQL")
+    ae.add_argument("--source", default="synthetic", help="synthetic, olist, or a folder path")
+    ae.add_argument("--pause", type=float, default=6.0, help="seconds between questions (free-tier rate limits)")
+    ae.set_defaults(func=_cmd_ask_eval)
     gb = sub.add_parser("gpu-benchmark", help="CPU against GPU (RAPIDS Accelerator) on the same data")
     gb.add_argument("--source", default="synthetic", help="synthetic, olist, or a folder path")
     gb.add_argument("--engines", default="cpu,gpu", help="cpu, gpu or cpu,gpu (default)")

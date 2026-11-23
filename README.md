@@ -121,6 +121,10 @@ python -m ecom_etl --help
 Real Olist data: `pip install -e ".[kaggle]"`, then
 `python -m ecom_etl download-olist` and `--source olist` in any command.
 
+Ask your data: `python -m ecom_etl ask "..."` or the dashboard's **Ask** tab. Gemini
+writes the SQL from the schema alone; it runs read-only on your Postgres. See
+[`docs/ASK.md`](docs/ASK.md) (key in a git-ignored `.env`).
+
 GPU: the Spark batch also runs on an NVIDIA GPU with the RAPIDS Accelerator
 (`ECOM_GPU=1`; WSL2 on Windows); see [`docs/GPU.md`](docs/GPU.md) and
 `python -m ecom_etl gpu-benchmark`.
