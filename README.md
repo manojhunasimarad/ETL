@@ -68,6 +68,7 @@ All ten steps are built and pass CI. Each has a study note.
 | 8 | [Orchestration with Airflow](docs/steps/STEP-08-airflow.md) | **done** |
 | 9 | [Streaming with Kafka and Spark Structured Streaming](docs/steps/STEP-09-streaming.md) | **done** |
 | 10 | [Databricks, Snowflake, final numbers](docs/steps/STEP-10-cloud.md) | **done** (cloud runs: yours to do, see the note) |
+| 11 | [LLM enrichment of review comments](docs/steps/STEP-11-llm-enrichment.md) | **built** (Olist run on Kaggle or the V100: yours to do) |
 
 Built step by step, following the order of the
 [DataTalksClub Data Engineering Zoomcamp](https://github.com/DataTalksClub/data-engineering-zoomcamp).
@@ -124,6 +125,10 @@ Real Olist data: `pip install -e ".[kaggle]"`, then
 Ask your data: `python -m ecom_etl ask "..."` or the dashboard's **Ask** tab. Gemini
 writes the SQL from the schema alone; it runs read-only on your Postgres. See
 [`docs/ASK.md`](docs/ASK.md) (key in a git-ignored `.env`).
+
+Review enrichment (step 11): `python -m ecom_etl enrich-reviews --source sample` labels
+review comments with an LLM (sentiment, topics, follow-up), deduplicated, cached and batched;
+Gemini by default, or a local model on Kaggle or the V100. See [`docs/LLM.md`](docs/LLM.md).
 
 GPU: the Spark batch also runs on an NVIDIA GPU with the RAPIDS Accelerator
 (`ECOM_GPU=1`; WSL2 on Windows); see [`docs/GPU.md`](docs/GPU.md) and

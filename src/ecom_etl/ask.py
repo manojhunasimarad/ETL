@@ -130,12 +130,21 @@ class Gemini:
     timeout: float = 60.0
     retries: int = 2
     transport: Transport = _urlopen
+    temperature: Optional[float] = None  # None: the model's default
 
     def generate_json(self, system: str, prompt: str) -> Tuple[dict, dict]:
-        """Return (parsed JSON answer, token usage)."""
+        """Return (parsed JSON answer with a "sql" field, token usage)."""
+        text, usage = self.generate_text(system, prompt)
+        return parse_json_answer(text), usage
+
+    def generate_text(self, system: str, prompt: str) -> Tuple[str, dict]:
+        """Return (the model's JSON text, token usage). Used by ask (SQL) and enrich (reviews)."""
+        generation = {"responseMimeType": "application/json"}
+        if self.temperature is not None:
+            generation["temperature"] = self.temperature
         body = {"systemInstruction": {"parts": [{"text": system}]},
                 "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-                "generationConfig": {"responseMimeType": "application/json"}}
+                "generationConfig": generation}
         request = urllib.request.Request(
             API_URL.format(model=self.model), data=json.dumps(body).encode("utf-8"), method="POST",
             headers={"Content-Type": "application/json", "x-goog-api-key": self.key})
@@ -160,7 +169,7 @@ class Gemini:
             raise LlmError(f"Gemini returned no answer: {json.dumps(reply.get('promptFeedback', reply))[:300]}")
         parts = candidates[0].get("content", {}).get("parts", [])
         text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
-        return parse_json_answer(text), reply.get("usageMetadata", {})
+        return text, reply.get("usageMetadata", {})
 
 
 def parse_json_answer(text: str) -> dict:
@@ -375,11 +384,18 @@ def record(answer: Answer, source: str, path: Optional[Path] = None) -> Path:
     return path
 
 
+def _default_llm():
+    """Gemini unless ECOM_LLM_PROVIDER picks another backend (see llm.py and docs/LLM.md)."""
+    from .llm import make_llm
+
+    return make_llm(purpose="ask")
+
+
 def ask_warehouse(question: str, source: str, llm=None) -> Answer:
     """The whole path for one question against ``<source>_gold``."""
     gold = schema_name(source, "gold")
     ensure_reader(source)
-    llm = llm or Gemini(api_key())
+    llm = llm or _default_llm()
     answer = ask(question, describe_schema(gold), gold, llm, lambda q: run_readonly(q, gold))
     record(answer, source)
     return answer
@@ -418,7 +434,7 @@ def evaluate(source: str, llm=None, pause: float = 6.0) -> List[dict]:
 
     gold = schema_name(source, "gold")
     ensure_reader(source)
-    llm = llm or Gemini(api_key())
+    llm = llm or _default_llm()
     schema_text = describe_schema(gold)
     results = []
     for i, analysis in enumerate(load_analyses(source)):
