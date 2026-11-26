@@ -32,12 +32,38 @@ from . import config
 from .generator import GeneratorConfig, generate, load_manifest
 
 
+def _defect_rate(text: str) -> float:
+    """--defect-rate: a number from 0 to 0.05, refused with one line instead of a traceback."""
+    try:
+        rate = float(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"'{text}' is not a number; use a rate such as 0.01") from None
+    if not 0 <= rate <= 0.05:
+        raise argparse.ArgumentTypeError(f"{text} is outside 0 to 0.05: above 5% per defect type, "
+                                         "defects would hit most rows and the ground truth stops being useful")
+    return rate
+
+
+def _orders(text: str) -> int:
+    try:
+        n = int(text.replace(",", "").replace("_", ""))
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"'{text}' is not a whole number of orders") from None
+    if n < 1:
+        raise argparse.ArgumentTypeError("--orders must be at least 1")
+    return n
+
+
 def _cmd_generate(args: argparse.Namespace) -> int:
     cfg = GeneratorConfig(orders=args.orders, seed=args.seed, defect_rate=args.defect_rate,
                           start=args.start, end=args.end)
     out = Path(args.out) if args.out else config.source_dir("synthetic")
     t0 = time.perf_counter()
-    manifest = generate(cfg, out)
+    try:
+        manifest = generate(cfg, out)
+    except ValueError as exc:   # a setting the generator refuses, such as --start after --end
+        print(f"generate: {exc}", file=sys.stderr)
+        return 2
     elapsed = time.perf_counter() - t0
     print(f"Wrote synthetic data to {out} in {elapsed:.1f}s")
     for table, rows in manifest["row_counts"].items():
@@ -579,9 +605,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     g = sub.add_parser("generate", help="write synthetic Olist-shaped data")
-    g.add_argument("--orders", type=int, default=10_000, help="number of orders (default 10,000)")
+    g.add_argument("--orders", type=_orders, default=10_000, help="number of orders (default 10,000)")
     g.add_argument("--seed", type=int, default=42)
-    g.add_argument("--defect-rate", type=float, default=0.01,
+    g.add_argument("--defect-rate", type=_defect_rate, default=0.01,
                    help="probability of each defect type per eligible row (0 to 0.05, default 0.01)")
     g.add_argument("--start", type=date.fromisoformat, default=date(2017, 1, 1))
     g.add_argument("--end", type=date.fromisoformat, default=date(2018, 8, 31))

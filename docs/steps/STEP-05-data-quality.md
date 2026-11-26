@@ -100,12 +100,13 @@ row-level rule need different reactions.
 
 ## 3. Run it
 
-```bash
-docker compose run --rm pipeline run --source synthetic     # whole pipeline
-docker compose run --rm pipeline quality --source synthetic # re-check only
+```powershell
+docker compose run --rm pipeline generate --orders 20000      # the size of the output below
+docker compose run --rm pipeline run --source synthetic       # whole pipeline with gates
+docker compose run --rm pipeline quality --source synthetic   # re-check only
 ```
 
-Output of `run` on 20,000 synthetic orders at the default 1% defect rate
+Output of `run` on those 20,000 synthetic orders at the default 1% defect rate
 (CI run, 4-vCPU GitHub runner):
 
 ```
@@ -134,7 +135,8 @@ run") come from this report; copy them into
 
 ## 4. Exercises
 
-1. Lower `MAX_QUARANTINE_RATE` to 1% and run. Which gate blocks? Read the exit code.
+1. Lower `MAX_QUARANTINE_RATE` to 0.01 in `src/ecom_etl/spark/quality.py` and run. Which gate blocks?
+   Read the exit code (PowerShell: `echo $LASTEXITCODE`, which prints 2). Set it back to 0.10 afterwards.
 2. Add a row-level rule: `freight_value <= price * 3` as a **warning**. Where do you add it so it shows up in silver, the registry and the report?
 3. Run `run` twice. What does `orders.volume_change` say the second time? Then generate 1,000 orders and run again.
 4. Query the history in Postgres: quarantined rows per run and reason.

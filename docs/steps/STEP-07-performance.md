@@ -21,6 +21,8 @@ and every shuffle writes data to disk and reads it back over the network
 
 Open http://localhost:4040 while a job runs: the Spark UI shows jobs,
 stages, tasks, shuffle sizes and the SQL plan with the join strategy used.
+In Docker, publish the port when you start the job (`docker compose run --rm
+-p 4040:4040 pipeline ...`); otherwise the browser cannot reach it.
 
 ### 1.2 Shuffle partitions
 
@@ -107,10 +109,18 @@ be avoided. In the Spark UI, look for one task much slower than the median.
 
 ## 3. Run it
 
-```bash
-docker compose run --rm pipeline generate --orders 200000
-docker compose run --rm pipeline benchmark --source synthetic --repeat 2
+On a laptop with 8 GB of RAM (Spark gets 2 GB by default), start at 50,000
+orders and go to 200,000 only if that finishes comfortably. Close the browser
+tabs you do not need while it runs.
+
+```powershell
+docker compose run --rm pipeline generate --orders 50000
+docker compose run --rm -p 4040:4040 pipeline benchmark --source synthetic --repeat 2
 ```
+
+While it runs, open http://localhost:4040, SQL tab: find `SortMergeJoin` in the
+baseline run and `BroadcastHashJoin` in the tuned one. `--orders 200000` writes
+201,874 order rows, because about 1% are injected duplicates.
 
 The report is written to `reports/benchmark_synthetic.md`. Run it on your
 own machine for the numbers you put on your resume, and record them in

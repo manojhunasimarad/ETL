@@ -115,6 +115,23 @@ Details and troubleshooting: [`cloud/databricks/README.md`](../../cloud/databric
 
 ### 3.2 Snowflake trial
 
+On Windows, the two Spark commands run in Docker and the load runs in PowerShell
+(the export's folders sit next to its manifest, so the loader finds them on either side):
+
+```powershell
+docker compose run --rm pipeline run --source synthetic --no-load      # gold in the lake (Spark, so Docker)
+docker compose run --rm pipeline export-snowflake --source synthetic   # Parquet + _manifest.json + reports\snowflake_synthetic.sql
+pip install -e ".[snowflake]"                                          # in the Windows .venv
+$env:SNOWFLAKE_ACCOUNT = "<orgname-accountname>"
+$env:SNOWFLAKE_USER = "<your user>"
+$env:SNOWFLAKE_AUTHENTICATOR = "externalbrowser"                       # signs in through your browser
+python -m ecom_etl load-snowflake --source synthetic                   # every table must say ok; exit code 1 if a count differs
+```
+
+The `$env:` lines last only for that PowerShell window.
+
+On Linux, WSL or macOS (Spark installed natively):
+
 ```bash
 python -m ecom_etl run --source synthetic --no-load      # gold in the lake
 python -m ecom_etl export-snowflake --source synthetic   # Parquet + reports/snowflake_synthetic.sql

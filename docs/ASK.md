@@ -48,7 +48,8 @@ check that the guards hold even when the first check is bypassed.
 1. Get a key in Google AI Studio (API keys page).
 2. Copy `.env.example` to `.env` at the root of the repository and set
    `GEMINI_API_KEY=...`. `.env` is git-ignored; never put the key anywhere else.
-3. Load gold into Postgres (`python -m ecom_etl run --source synthetic`).
+3. Load gold into Postgres: `docker compose run --rm pipeline run --source synthetic` (Spark runs in
+   Docker on Windows; on Linux or WSL with Spark installed, `python -m ecom_etl run --source synthetic`).
 4. Ask: `python -m ecom_etl ask "..."`, or open the dashboard's **Ask** tab.
 
 The model is `gemini-flash-latest`, an alias Google moves to each new Flash

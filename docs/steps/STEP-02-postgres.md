@@ -118,30 +118,35 @@ Spark ETL).
 
 ## 3. Run it
 
-Needs Docker Desktop (with WSL 2 on Windows).
+Needs Docker Desktop (with WSL 2 on Windows). Postgres runs in Docker; these
+commands are plain Python, so on Windows they run in PowerShell inside the `.venv`.
 
-```bash
+```powershell
 docker compose up -d postgres
 pip install -e ".[dev,postgres]"
-python -m ecom_etl generate
+python -m ecom_etl generate --orders 5000     # the size the output below uses
 python -m ecom_etl load-raw --source synthetic
 python -m ecom_etl build-core --source synthetic
-pytest -q -rs                       # the Postgres tests now run instead of skipping
+pytest -q -rs                                 # the Postgres tests now run instead of skipping
 ```
 
-Output of `build-core` for 5,000 synthetic orders (from a CI run); the
-`removed` column is duplicates plus rejected rows, including order lines
+Output of `build-core` for those 5,000 synthetic orders (rerun on Postgres 16);
+the `removed` column is duplicates plus rejected rows, including order lines
 and payments of rejected orders:
 
 ```
   table                        raw      core   removed
   customers                  5,062     5,000        62
   sellers                      156       156         0
+  category_translation          20        22        -2
   products                   1,666     1,666         0
   orders                     5,061     4,805       256
   order_items                5,656     5,333       323
   order_payments             5,286     4,914       372
 ```
+
+The `-2` is not a bug: two categories used by products had no English name,
+so core adds them with `is_translated = FALSE` instead of rejecting their products.
 
 Browse the tables: `docker compose --profile tools up -d`, open
 http://localhost:5050 (no login), server "ecom (docker)", password `ecom`.

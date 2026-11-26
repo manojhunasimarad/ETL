@@ -233,6 +233,8 @@ def generate(config: GeneratorConfig, out_dir: Path) -> dict:
         raise ValueError("orders must be >= 1")
     if not 0 <= config.defect_rate <= 0.05:
         raise ValueError("defect_rate must be between 0 and 0.05")
+    if config.start >= config.end:
+        raise ValueError(f"start ({config.start}) must be before end ({config.end})")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     rng = random.Random(config.seed)

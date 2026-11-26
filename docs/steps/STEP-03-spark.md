@@ -54,7 +54,10 @@ where failures can be caught and explained.
    the `_fixes` array of the row (`normalized:order_status`,
    `decimal_comma:price`, `zero_padded:customer_zip_code_prefix`,
    `added_translation:product_category_name`).
-2. **Exact duplicates**: `dropDuplicates` on all business columns.
+2. **Exact duplicates**: rows equal in every business column are counted and
+   removed, keeping the **first copy loaded** (`row_number()` over the business
+   columns, ordered by `_row_id`). `dropDuplicates` would keep an arbitrary copy,
+   which can change between recomputations when caching is off (step 10).
 3. **Safe casts**: Spark 4 runs in **ANSI mode** by default, so
    `cast("abc" as int)` raises an error and kills the job. `try_cast` and
    `try_to_timestamp` return NULL instead, and a rule turns "value present
@@ -83,9 +86,13 @@ as none; step 7 measures this.
 
 ### 1.7 Persist
 
-Silver calls `.persist()` on the validated DataFrame because it is used
-several times (silver write, quarantine write, counts, reason tallies).
-Without it, Spark would recompute the whole chain for every action.
+Silver calls `persist()` (through `compat.persist`) on the deduplicated and the
+validated DataFrames, because each is used several times (silver write,
+quarantine write, counts, reason tallies). Without it, Spark would recompute
+the whole chain for every action. Caching can be switched off with
+`ECOM_NO_CACHE=1` (Databricks serverless refuses `persist()`, step 10); the
+results stay the same, only slower, because nothing relies on the cache for
+correctness.
 
 ---
 
@@ -102,15 +109,17 @@ Without it, Spark would recompute the whole chain for every action.
 ## 3. Run it
 
 Spark needs Java 17+. On Windows, Spark cannot write files without extra
-Hadoop binaries, so run it **in Docker** (or in WSL):
+Hadoop binaries, so run it **in Docker** (or in WSL). Docker sees the same
+`data\` folder, so the 5,000 orders from step 2 are still there:
 
-```bash
+```powershell
 docker compose up -d postgres
-docker compose --profile pipeline build pipeline
-docker compose run --rm pipeline generate
+docker compose --profile pipeline build pipeline       # first time: several minutes
 docker compose run --rm pipeline bronze --source synthetic
 docker compose run --rm pipeline silver --source synthetic
 ```
+
+(No data yet? `docker compose run --rm pipeline generate --orders 5000` first.)
 
 In WSL or Linux with Java 17 installed:
 
@@ -135,7 +144,8 @@ The silver counts are identical to the `core` counts of the SQL path in
 step 2 (4,805 / 5,333 / 4,914): two independent implementations of the
 same rules agree. Reports are saved in `data/lake/<source>/_reports/`.
 
-Look at the data with PySpark:
+Look at the data with PySpark. In Docker, open Python inside the container with
+`docker compose run --rm --entrypoint python pipeline`, then:
 
 ```python
 from ecom_etl.spark.session import get_spark
@@ -151,8 +161,10 @@ q.select("order_id", "price", "_reasons").show(truncate=False)
 1. Run silver on Olist. Which reasons appear? Compare with your step 1 decisions.
 2. Count the `_warnings` on Olist orders (carrier pickup before approval).
    Would you quarantine them? What would that cost?
-3. Remove `.persist()` in `validate_table`, run on 1M orders, and compare
-   the time. Look at the Spark UI (http://localhost:4040 while it runs).
+3. Run silver with caching switched off (`docker compose run --rm -e ECOM_NO_CACHE=1 -p 4040:4040
+   pipeline silver --source synthetic`) on 200,000 orders and compare the time with a normal run.
+   Watch the Spark UI at http://localhost:4040 while it runs: the port must be published
+   with `-p 4040:4040`, or the browser cannot reach it inside Docker.
 4. Read silver orders for one month only and call `.explain()`. Find
    `PartitionFilters` in the plan.
 5. Why would `inferSchema` be wrong for `customer_zip_code_prefix`? Try it.

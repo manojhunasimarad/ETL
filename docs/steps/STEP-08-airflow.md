@@ -81,7 +81,9 @@ docker compose --profile airflow up -d airflow
 
 Open http://localhost:8080 (no login in this local setup), find
 `ecom_batch_pipeline`, switch it on, and press **Trigger** (optionally
-"Trigger with config": `{"source": "olist"}`). Watch the Graph view; open
+"Trigger with config": `{"source": "olist"}`). Note: a synthetic run starts by
+regenerating `data/raw/synthetic` with the DAG's `orders` parameter (20,000 by
+default), so it replaces whatever synthetic data you made by hand before. Watch the Graph view; open
 a task's log to see the CLI output. On Linux, put `AIRFLOW_UID=<your id -u>`
 in `.env` first so the files written to `./data` stay yours.
 
@@ -104,7 +106,9 @@ off, and `docker/airflow-start.sh` creates the `airflow` database first.
 
 ## 3. Exercises
 
-1. Make `silver_gate` fail (lower `MAX_QUARANTINE_RATE` to 1%) and trigger the DAG. Which tasks run, which are skipped?
+1. Make `silver_gate` fail (set `MAX_QUARANTINE_RATE = 0.01` in `src/ecom_etl/spark/quality.py`) and trigger the DAG.
+   Which tasks run? The ones after the failed gate end as `upstream_failed`, not "skipped": what is the difference?
+   Set it back to 0.10 afterwards, and free the RAM with `docker compose --profile airflow stop airflow`.
 2. Add an `on_failure_callback` that prints which gate failed and the path of the report.
 3. Add a sensor task that waits for the Olist files to exist before `extract`.
 4. Change the schedule to weekdays at 06:00 IST. What is the cron expression, and in which time zone does Airflow interpret it?

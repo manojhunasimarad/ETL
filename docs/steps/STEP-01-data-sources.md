@@ -188,7 +188,7 @@ The 14 injected defect types (see `DEFECT_SPECS` in `generator.py`):
 python -m venv .venv
 .venv\Scripts\Activate.ps1          # if blocked: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 pip install -e ".[dev]"
-pytest -q                           # 17 passed, 3 skipped (the skips are your turn)
+pytest -q                           # 0 failed; every skip names what it waits for (Spark, Postgres, Kafka, Airflow or "your turn")
 
 python -m ecom_etl generate         # 10,000 orders into data\raw\synthetic
 python -m ecom_etl profile          # report in reports\profile_synthetic.md
@@ -230,7 +230,7 @@ implement it.
 ```bash
 pytest -rs tests/test_your_turn.py     # 3 skipped: your task
 # implement the function, then:
-pytest -q                              # 20 passed
+pytest -q                              # still 0 failed, and the 3 "your turn" skips are gone
 python -m ecom_etl profile             # a new warn finding: customers_without_orders
 ```
 
@@ -299,7 +299,7 @@ Commit it from your machine on this step's branch (see
 
 ## 8. Done when
 
-- [ ] `pytest` passes on your machine with no "your turn" skips left (20 passed)
+- [ ] `pytest` passes on your machine: 0 failed, no "your turn" skips left
 - [ ] you have profiled both synthetic and real Olist data
 - [ ] you have a fix/dedupe/quarantine/accept decision for each Olist finding
 - [ ] you can answer the 8 questions above without looking

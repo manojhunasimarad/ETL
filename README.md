@@ -54,7 +54,7 @@ flowchart LR
 
 ## Status
 
-All ten steps are built and pass CI. Each has a study note.
+All eleven steps are built and pass CI ("built" means the code, not your own run of it). Each has a study note.
 
 | Step | Topic | Status |
 |---|---|---|
@@ -105,18 +105,30 @@ docker compose run --rm pipeline analyze --source synthetic
 docker compose --profile dashboard up -d dashboard       # http://localhost:8501
 docker compose --profile airflow up -d airflow           # http://localhost:8080
 docker compose --profile streaming up -d --wait kafka
-docker compose run --rm pipeline produce --source synthetic --limit 5000
+docker compose run --rm pipeline produce --source synthetic --limit 3000
 docker compose run --rm pipeline stream --source synthetic --reset
 docker compose --profile tools up -d pgadmin             # http://localhost:5050
 ```
 
-Without Docker (Python 3.10+, Java 17 for Spark):
+Without Docker on Linux, WSL or macOS (Python 3.10+, Java 17 for Spark):
 
 ```bash
-python -m venv .venv && source .venv/bin/activate        # Windows: .venv\Scripts\Activate.ps1
+python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,spark,postgres,dashboard,streaming]"
 pytest -q                                                # integration tests skip without Postgres/Kafka
 python -m ecom_etl --help
+```
+
+On Windows, keep Spark in Docker: Spark needs Java 17 and Hadoop's `winutils` to
+write files there, and once PySpark is in the Windows `.venv` the Spark tests stop
+skipping and fail. The plain-Python commands (`generate`, `profile`, `load-raw`,
+`build-core`, `analyze`, `ask`, `enrich-reviews`, `load-snowflake`, `pytest`) run in
+PowerShell:
+
+```powershell
+python -m venv .venv; .venv\Scripts\Activate.ps1          # if blocked: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+pip install -e ".[dev,postgres,dashboard,kaggle]"          # no "spark" here, on purpose
+pytest -q                                                  # 0 failed; Spark, Kafka and Airflow tests skip
 ```
 
 Real Olist data: `pip install -e ".[kaggle]"`, then
@@ -159,7 +171,7 @@ docker/, docker-compose.yml
 cloud/                Databricks notebook, Snowflake notes and queries
 tests/                unit tests and integration tests (Spark, Postgres, Kafka)
 docs/
-  ROADMAP.md          the 10 steps, the job-description mapping, learning material
+  ROADMAP.md          the 11 steps, the job-description mapping, learning material
   WORKFLOW.md         how each step is learned, built and merged
   RESULTS.md          measured numbers only
   STORIES.md          interview stories, one per step

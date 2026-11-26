@@ -1,6 +1,8 @@
 # Roadmap
 
-The project is built in 10 steps. Each step is one branch and one pull
+The project is built in 11 steps (the eleventh, LLM enrichment, was added after
+the first ten). "Built" below means the code is written and passes CI; your own
+run-and-learn work is tracked in the study site's ETL guide. Each step is one branch and one pull
 request with a few small commits, has a study note in
 [`docs/steps/`](steps/), and must be understood before the next one
 starts. How each step is learned and built is described in
@@ -23,6 +25,7 @@ against a campus-hire Data Engineer job description (see the mapping below).
 | 8 | Orchestration with Airflow | Airflow in Docker, DAG for the batch pipeline, retries, backfills, idempotent reruns | 02-workflow-orchestration (Zoomcamp uses Kestra; we use Airflow) | **done** |
 | 9 | Streaming | Kafka (KRaft), order event producer with injected duplicates, late and malformed messages, Spark Structured Streaming with schema, watermark, dedupe and windowed metrics | 07-streaming | **done** |
 | 10 | Cloud platforms and wrap-up | Same Spark job on Databricks Free Edition; gold tables in a Snowflake trial; full CI; final numbers | Final project | **done** (cloud runs pending) |
+| 11 | LLM enrichment of review comments | Sentiment, topics and a follow-up flag for Olist review comments; deduplication, a content-hash cache and batching; validation, quarantine and a 2% gate; measured against stars and a keyword baseline | (beyond the Zoomcamp) | **built** (Olist run pending) |
 
 Steps 1 to 7 cover the job description's required skills and duties.
 Steps 8 to 10 cover its *preferred* qualifications; if time is short,
@@ -64,7 +67,7 @@ flowchart LR
         Q[quarantine: rejected rows]
     end
     subgraph wh[Warehouse - Postgres]
-        R[raw schema - normalized]
+        R[raw schema as text, then normalized core]
         F[fact_order_line / fact_payment]
         D[dim_customer SCD2 / product / seller / date]
     end
@@ -106,15 +109,18 @@ on the star schema for revenue and delivery metrics."
 
 Each step note lists exact chapters and videos; this is the plan.
 
+Reading is yours to tick off: nothing in this table is marked as read.
+
 | Step | O'Reilly | LinkedIn Learning | Other |
 |---|---|---|---|
 | 1 | *Fundamentals of Data Engineering* ch. 2, 5 | Data Engineering Foundations; Data Science Foundations: Data Engineering | |
-| 2 | *Fundamentals of Data Engineering* ch. 6, 7, and the data modeling part of ch. 8 (normalization) | | **done** |
-| 3 | *Learning Spark, 2nd Ed.* ch. 1-4 | Apache Spark Essential Training: Big Data Engineering | **done** |
-| 4 | *The Data Warehouse Toolkit, 3rd Ed.* ch. 1-3, and ch. 5 for slowly changing dimensions | Introduction to Data Warehouses | **done** |
-| 5 | *Data Quality Fundamentals* ch. 1-4 | | **done** |
-| 6 | *SQL for Data Analysis* (Tanimura) | | **done** |
-| 7 | *Learning Spark* ch. 7; *High Performance Spark* | | **done** |
-| 8 | *Data Pipelines Pocket Reference*; Airflow docs | Hands-On Introduction: Data Engineering (Airflow) | **done** |
-| 9 | *Kafka: The Definitive Guide, 2nd Ed.*; *Learning Spark* ch. 8 | Apache Kafka Essential Training: Getting Started | **done** |
+| 2 | *Fundamentals of Data Engineering* ch. 6, 7, and the data modeling part of ch. 8 (normalization) | | |
+| 3 | *Learning Spark, 2nd Ed.* ch. 1-4 | Apache Spark Essential Training: Big Data Engineering | |
+| 4 | *The Data Warehouse Toolkit, 3rd Ed.* ch. 1-3, and ch. 5 for slowly changing dimensions | Introduction to Data Warehouses | |
+| 5 | *Data Quality Fundamentals* ch. 1-4 | | |
+| 6 | *SQL for Data Analysis* (Tanimura) | | |
+| 7 | *Learning Spark* ch. 7; *High Performance Spark* | | |
+| 8 | *Data Pipelines Pocket Reference*; Airflow docs | Hands-On Introduction: Data Engineering (Airflow) | |
+| 9 | *Kafka: The Definitive Guide, 2nd Ed.*; *Learning Spark* ch. 8 | Apache Kafka Essential Training: Getting Started | |
 | 10 | *Snowflake Data Engineering* (Manning, on O'Reilly); *Data Engineering Design Patterns* | | Databricks Free Edition docs, Snowflake trial docs |
+| 11 | *AI Engineering* (Chip Huyen) ch. 3-4 on evaluation | | Gemini API docs (structured output), Ollama docs |
