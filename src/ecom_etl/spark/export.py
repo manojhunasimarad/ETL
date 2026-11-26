@@ -47,7 +47,19 @@ def export_for_snowflake(spark, lake: Lake, out_dir: Optional[Path] = None) -> D
 
 
 def read_manifest(out_dir: Path) -> Dict[str, dict]:
-    path = Path(out_dir) / "_manifest.json"
+    """The export's manifest, with each table's files taken from the folder next to it.
+
+    The manifest records absolute paths. An export made in Docker records ``/app/data/...``,
+    which does not exist when ``load-snowflake`` then runs in Windows PowerShell. The table
+    folders always sit next to ``_manifest.json``, so use those whenever they exist.
+    """
+    out_dir = Path(out_dir)
+    path = out_dir / "_manifest.json"
     if not path.exists():
         raise FileNotFoundError(f"{path} not found; run `python -m ecom_etl export-snowflake` first")
-    return json.loads(path.read_text(encoding="utf-8"))
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    for table, info in manifest.items():
+        here = out_dir / table
+        if here.is_dir():
+            info["files"] = str(here.resolve())
+    return manifest

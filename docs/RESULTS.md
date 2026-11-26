@@ -19,6 +19,8 @@ resume bullet; if a row is "pending", the bullet keeps its `XX`.
 | Batch without caching (the Databricks serverless path) | 70.6 s for generate, bronze, silver, gates, gold and gates; same 91,521 bronze records and the same gold row counts as the cached run (68.9 s without its Postgres load) | 20,000 synthetic orders, 1% defects | `ECOM_NO_CACHE=1` `run_batch(...)` | GitHub runner, 4 cores, Spark 4.1.4 | 2026-11-22 |
 | Databricks Free Edition run | pending: run `cloud/databricks/ecom_pipeline.py` | 20,000 synthetic orders | notebook | Databricks serverless | |
 | Snowflake load | pending: `load-snowflake`, every table `ok` | gold export | `load-snowflake` | Snowflake trial, X-Small | |
+| Review enrichment, sample (step 11) | pending: requests, seconds, agreement with hand labels vs keyword baseline | 40 bundled reviews (35 unique comments) | `enrich-reviews --source sample` | laptop, Gemini free tier | |
+| Review enrichment, Olist (step 11) | pending: comments/s, unique share, quarantine share, star agreement (model vs keyword baseline) | Olist reviews with a comment | `enrich-reviews --source olist` | Kaggle 2×T4 or V100, qwen2.5:7b-instruct | |
 
 Numbers above were measured on GitHub Actions runners by this repository's
 workflows. Re-run them on your own machine before an interview and add a

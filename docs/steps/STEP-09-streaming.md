@@ -97,12 +97,23 @@ you stop it.
 
 ## 3. Run it
 
-```bash
+```powershell
 docker compose up -d postgres
+docker compose run --rm pipeline generate --orders 20000     # the orders the CI numbers below use
 docker compose --profile streaming up -d --wait kafka
-docker compose run --rm pipeline produce --source synthetic --limit 5000
+docker compose run --rm pipeline produce --source synthetic --limit 3000
 docker compose run --rm pipeline stream --source synthetic --reset
 ```
+
+With 3,000 events your numbers must match the "test job" column below exactly.
+A second `produce` adds to the topic. To start again from an empty topic:
+
+```powershell
+docker compose --profile streaming exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic orders
+```
+
+The Spark UI of a stream: add `-p 4040:4040` to the `stream` command and open
+http://localhost:4040 while it runs.
 
 Live mode: in one terminal `docker compose run --rm pipeline stream --continuous`,
 in another `docker compose run --rm pipeline produce --rate 20`, and watch

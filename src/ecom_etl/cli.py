@@ -17,6 +17,7 @@ Commands:
   benchmark       (step 7) baseline vs tuned Spark, partition pruning, Postgres indexes
   produce         (step 9) send order events to Kafka, with duplicates, late and malformed messages
   stream          (step 9) Spark Structured Streaming: Kafka -> bronze/silver/quarantine + daily revenue
+  enrich-reviews  (step 11) label review comments with an LLM: sentiment, topics, follow-up
 """
 
 from __future__ import annotations
@@ -31,12 +32,38 @@ from . import config
 from .generator import GeneratorConfig, generate, load_manifest
 
 
+def _defect_rate(text: str) -> float:
+    """--defect-rate: a number from 0 to 0.05, refused with one line instead of a traceback."""
+    try:
+        rate = float(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"'{text}' is not a number; use a rate such as 0.01") from None
+    if not 0 <= rate <= 0.05:
+        raise argparse.ArgumentTypeError(f"{text} is outside 0 to 0.05: above 5% per defect type, "
+                                         "defects would hit most rows and the ground truth stops being useful")
+    return rate
+
+
+def _orders(text: str) -> int:
+    try:
+        n = int(text.replace(",", "").replace("_", ""))
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"'{text}' is not a whole number of orders") from None
+    if n < 1:
+        raise argparse.ArgumentTypeError("--orders must be at least 1")
+    return n
+
+
 def _cmd_generate(args: argparse.Namespace) -> int:
     cfg = GeneratorConfig(orders=args.orders, seed=args.seed, defect_rate=args.defect_rate,
                           start=args.start, end=args.end)
     out = Path(args.out) if args.out else config.source_dir("synthetic")
     t0 = time.perf_counter()
-    manifest = generate(cfg, out)
+    try:
+        manifest = generate(cfg, out)
+    except ValueError as exc:   # a setting the generator refuses, such as --start after --end
+        print(f"generate: {exc}", file=sys.stderr)
+        return 2
     elapsed = time.perf_counter() - t0
     print(f"Wrote synthetic data to {out} in {elapsed:.1f}s")
     for table, rows in manifest["row_counts"].items():
@@ -509,14 +536,78 @@ def _cmd_load_snowflake(args: argparse.Namespace) -> int:
     return 0 if all(r["ok"] for r in results.values()) else 1
 
 
+# provider defaults: a hosted API is limited by requests per minute, so send big batches one at a time;
+# a local server is limited by the GPU, so send smaller batches in parallel (it batches them on the GPU)
+ENRICH_DEFAULTS = {"gemini": {"batch_size": 40, "workers": 1, "rpm": 8},
+                   "ollama": {"batch_size": 10, "workers": 4, "rpm": 0},
+                   "openai": {"batch_size": 10, "workers": 4, "rpm": 0}}
+
+
+def _cmd_enrich_reviews(args: argparse.Namespace) -> int:
+    from . import enrich as E
+    from .llm import Settings, describe, make_llm
+
+    provider = Settings.from_env(args.llm, args.model, args.base_url).provider
+    d = ENRICH_DEFAULTS[provider]
+    batch = args.batch_size or d["batch_size"]
+    workers = args.workers or d["workers"]
+    rpm = d["rpm"] if args.rpm is None else args.rpm
+    path = E.reviews_path(args.source)
+    if not path.exists():
+        print(f"No reviews file at {path}. Run download-olist, or use --source sample.", file=sys.stderr)
+        return 1
+    name = ("sample" if args.source == "sample" else "olist" if path.name == E.REVIEWS_FILE
+            else _source_name(args.source if path.suffix != ".csv" else path.stem))
+    out = Path(args.out) if args.out else config.DATA_DIR / "enriched" / name
+    if args.dry_run:
+        import os
+
+        from .llm import OLLAMA_MODEL
+        st = Settings.from_env(args.llm, args.model, args.base_url)
+        model = st.model or (os.environ.get("GEMINI_MODEL", "gemini-flash-latest") if provider == "gemini"
+                             else OLLAMA_MODEL if provider == "ollama" else "default")
+        p, _ = E.plan(E.load_reviews(path), E.Cache(out / "cache.jsonl"), model, batch, args.summaries, rpm,
+                      args.limit)
+        print(f"{p.rows:,} reviews, {p.with_text:,} with a comment, {p.unique_texts:,} unique, "
+              f"{p.cached:,} already cached.")
+        print(f"Would label {p.to_label:,} comments in {p.requests:,} request(s) of up to {batch}: "
+              f"about {p.input_tokens:,} input and {p.output_tokens:,} output tokens"
+              + (f", {p.minutes_at_rpm} min at {rpm:g} requests/min." if p.minutes_at_rpm else "."))
+        return 0
+    llm = make_llm(args.llm, args.model, args.base_url)
+    where = describe(llm)
+    print(f"Labelling {path.name} with {where}: batches of {batch}, {workers} at a time"
+          + (f", {rpm:g} requests/min" if rpm else "") + ".")
+    last = [0.0]
+
+    def progress(done, total):
+        if time.perf_counter() - last[0] > 5 or done == total:
+            last[0] = time.perf_counter()
+            print(f"  {done:,}/{total:,} comments")
+
+    labels = E.SAMPLE_LABELS if args.source == "sample" else (Path(args.labels) if args.labels else None)
+    result = E.enrich_reviews(path, llm, llm.model, out, batch, workers, rpm, args.summaries, args.limit,
+                              labels, progress)
+    md = E.report(result, name, where)
+    config.REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    (config.REPORTS_DIR / f"enrich_{name}.md").write_text(md, encoding="utf-8")
+    print(md)
+    print(f"Wrote {out / 'reviews_enriched.csv'} and reports/enrich_{name}.md")
+    if result.quarantine_share > args.max_quarantine:
+        print(f"GATE FAILED: {result.quarantine_share:.1%} of comments quarantined "
+              f"(limit {args.max_quarantine:.1%}). See {out / 'quarantine.csv'}.", file=sys.stderr)
+        return 2
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="ecom_etl", description="E-commerce batch and streaming ETL")
     sub = parser.add_subparsers(dest="command", required=True)
 
     g = sub.add_parser("generate", help="write synthetic Olist-shaped data")
-    g.add_argument("--orders", type=int, default=10_000, help="number of orders (default 10,000)")
+    g.add_argument("--orders", type=_orders, default=10_000, help="number of orders (default 10,000)")
     g.add_argument("--seed", type=int, default=42)
-    g.add_argument("--defect-rate", type=float, default=0.01,
+    g.add_argument("--defect-rate", type=_defect_rate, default=0.01,
                    help="probability of each defect type per eligible row (0 to 0.05, default 0.01)")
     g.add_argument("--start", type=date.fromisoformat, default=date(2017, 1, 1))
     g.add_argument("--end", type=date.fromisoformat, default=date(2018, 8, 31))
@@ -620,6 +711,22 @@ def build_parser() -> argparse.ArgumentParser:
     gb.add_argument("--worker", choices=["cpu", "gpu"], help=argparse.SUPPRESS)
     gb.add_argument("--out", help=argparse.SUPPRESS)
     gb.set_defaults(func=_cmd_gpu_benchmark)
+    er = sub.add_parser("enrich-reviews", help="step 11: label review comments with an LLM (sentiment, topics)")
+    er.add_argument("--source", default="sample", help="sample (40 bundled reviews), olist, or a reviews CSV")
+    er.add_argument("--llm", choices=["gemini", "ollama", "openai"], help="backend (default: ECOM_LLM_PROVIDER "
+                    "or gemini)")
+    er.add_argument("--model", help="model name (default: per backend)")
+    er.add_argument("--base-url", help="server address for openai/ollama, e.g. http://localhost:8080/v1")
+    er.add_argument("--batch-size", type=int, help="comments per request (default: 40 gemini, 10 local)")
+    er.add_argument("--workers", type=int, help="requests in parallel (default: 1 gemini, 4 local)")
+    er.add_argument("--rpm", type=float, help="max requests per minute, 0 = no limit (default: 8 gemini)")
+    er.add_argument("--limit", type=int, help="label at most this many new comments (a cheap first run)")
+    er.add_argument("--summaries", action="store_true", help="also write a short English summary (slower)")
+    er.add_argument("--labels", help="hand labels CSV to score against (automatic for --source sample)")
+    er.add_argument("--max-quarantine", type=float, default=0.02, help="gate: max share quarantined")
+    er.add_argument("--dry-run", action="store_true", help="print the cost estimate, send nothing")
+    er.add_argument("--out", help="output folder (default: data/enriched/<source>)")
+    er.set_defaults(func=_cmd_enrich_reviews)
     for name, helptext in (("export-snowflake", "step 10: write gold for Snowflake (Parquet + SQL script)"),
                            ("load-snowflake", "step 10: load the export into Snowflake (needs credentials)")):
         sf = sub.add_parser(name, help=helptext)

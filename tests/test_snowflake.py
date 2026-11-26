@@ -94,3 +94,30 @@ def test_script_is_complete_and_runnable_in_order():
     assert text.count("COPY INTO") == 2 and text.count("SELECT COUNT(*)") == 2
     assert all(line.endswith(";") for line in text.splitlines() if line and not line.startswith("--")
                and not line.startswith("    ") and not line.endswith("("))
+
+
+def test_manifest_from_docker_points_at_the_folders_next_to_it(tmp_path):
+    """An export made in Docker records /app/... paths; Windows must still find the files."""
+    import json
+
+    from ecom_etl.spark.export import read_manifest
+
+    out = tmp_path / "export" / "snowflake"
+    (out / "dim_product").mkdir(parents=True)
+    (out / "dim_product" / "part-0.parquet").write_bytes(b"")
+    manifest = {"dim_product": {"columns": [["product_sk", "bigint"]], "rows": 3,
+                                "files": "/app/data/lake/synthetic/export/snowflake/dim_product"},
+                "dim_seller": {"columns": [["seller_sk", "bigint"]], "rows": 2,
+                               "files": "/somewhere/else/dim_seller"}}
+    (out / "_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    got = read_manifest(out)
+    assert Path(got["dim_product"]["files"]) == (out / "dim_product").resolve()
+    assert got["dim_seller"]["files"] == "/somewhere/else/dim_seller"   # no folder here: left as written
+    assert got["dim_product"]["rows"] == 3
+
+
+def test_missing_manifest_says_what_to_run(tmp_path):
+    from ecom_etl.spark.export import read_manifest
+
+    with pytest.raises(FileNotFoundError, match="export-snowflake"):
+        read_manifest(tmp_path)

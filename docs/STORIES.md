@@ -81,3 +81,10 @@ Format:
 - **Action**: made caching optional (`ECOM_NO_CACHE`), made exact-duplicate removal keep the first loaded copy, exported gold with every column and microsecond timestamps, and wrote an idempotent Snowflake load with count checks.
 - **Result**: (fill in after running: Databricks timings and Snowflake counts from `RESULTS.md`)
 - **Trade-off / next time**: (fill in)
+
+## Step 11: LLM enrichment of review comments
+
+- **Problem**: star scores say how happy customers were but not why; the why is in Portuguese free text, and a model call is the most expensive operation in the pipeline, with a daily quota.
+- **Action**: labelled comments with an LLM (sentiment, topics, follow-up) behind one client for Gemini and OpenAI-compatible servers; cut calls with deduplication, a content-hash cache and batching; validated every answer, retried failures in smaller batches and quarantined the rest behind a 2% gate; measured against the star score and a free keyword baseline.
+- **Result**: (fill in after the Olist run: comments/s on which GPU, share removed by dedupe, quarantine share, agreement vs baseline, top complaint topics)
+- **Trade-off / next time**: (fill in)

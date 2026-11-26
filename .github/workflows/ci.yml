@@ -42,6 +42,20 @@ jobs:
           "$JAVA_HOME_17_X64/bin/java" -version
       - name: Install
         run: pip install -e ".[dev,postgres,spark,dashboard,streaming]"
+      - name: Cache the jars Spark downloads from Maven
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.ivy2.5.2
+            ~/.ivy2
+          key: spark-jars-${{ runner.os }}-${{ hashFiles('pyproject.toml', 'src/ecom_etl/spark/warehouse.py', 'src/ecom_etl/spark/streaming.py') }}
+      - name: Fetch Spark's Maven jars first (retried; one failed download used to fail the whole job)
+        run: |
+          for i in 1 2 3; do
+            python -c "from ecom_etl.spark.session import get_spark; from ecom_etl.spark.warehouse import PG_JDBC_PACKAGE; from ecom_etl.spark.streaming import kafka_package; get_spark('prefetch', packages=[PG_JDBC_PACKAGE, kafka_package()]).stop()" && exit 0
+            echo "Maven download failed (attempt $i); retrying in 20 s"; sleep 20
+          done
+          exit 1
       - name: Tests (unit + integration)
         run: pytest -q -rs
       - name: Smoke run
@@ -95,6 +109,20 @@ jobs:
           pip install "apache-airflow==${AIRFLOW_VERSION}" \
             --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-3.11.txt"
           pip install "apache-airflow==${AIRFLOW_VERSION}" -e ".[dev,postgres,spark]"
+      - name: Cache the jars Spark downloads from Maven
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.ivy2.5.2
+            ~/.ivy2
+          key: spark-jars-${{ runner.os }}-${{ hashFiles('pyproject.toml', 'src/ecom_etl/spark/warehouse.py', 'src/ecom_etl/spark/streaming.py') }}
+      - name: Fetch Spark's Maven jars first (retried; one failed download used to fail the whole job)
+        run: |
+          for i in 1 2 3; do
+            python -c "from ecom_etl.spark.session import get_spark; from ecom_etl.spark.warehouse import PG_JDBC_PACKAGE; get_spark('prefetch', packages=[PG_JDBC_PACKAGE]).stop()" && exit 0
+            echo "Maven download failed (attempt $i); retrying in 20 s"; sleep 20
+          done
+          exit 1
       - name: DAG structure tests
         run: pytest -q tests/test_airflow_dag.py
       - name: Run the whole DAG once (airflow dags test)

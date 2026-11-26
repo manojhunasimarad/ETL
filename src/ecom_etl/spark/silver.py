@@ -5,8 +5,8 @@ For every table, in this order:
 1. **Standardize** (the "fix" rules from step 1): trim, empty string to
    null, lower-case statuses and payment types, decimal comma to point,
    zero-pad zip codes. Every fix applied to a row is recorded in ``_fixes``.
-2. **Exact duplicates** are dropped (``dropDuplicates`` on all business
-   columns) and counted.
+2. **Exact duplicates** are counted and removed, keeping the first copy
+   loaded (``row_number`` over all business columns, ordered by ``_row_id``).
 3. **Type**: safe casts (``try_cast``, ``try_to_timestamp``) that give NULL
    instead of failing. Spark 4 runs in ANSI mode, where a plain ``cast``
    of "abc" to a number raises an error and kills the job.

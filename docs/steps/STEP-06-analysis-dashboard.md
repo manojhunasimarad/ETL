@@ -74,10 +74,10 @@ docker compose run --rm pipeline analyze --source synthetic   # reports/analysis
 docker compose --profile dashboard up -d dashboard           # http://localhost:8501
 ```
 
-Without Docker: `pip install -e ".[postgres,dashboard]"`, then
-`streamlit run dashboard/app.py`.
+Both also run natively in PowerShell (no Spark involved): `pip install -e ".[postgres,dashboard]"`,
+then `python -m ecom_etl analyze --source synthetic` and `streamlit run dashboard/app.py`.
 
-First row of each answer on 20,000 synthetic orders (CI run):
+First row of five of the ten answers on 20,000 synthetic orders (CI run); the rest are in `reports/analysis_synthetic.md`:
 
 ```
 Q2  category=cool_stuff        items_revenue=311,987.88  share_pct=12.99
@@ -91,7 +91,7 @@ Q7  seller_rank=1              cumulative_revenue_pct=5.2 (top 0.2% of sellers)
 
 1. Rewrite Q1 without a window function (self-join on the previous month). Compare readability and the `EXPLAIN` plan.
 2. Q3 uses the state at order time. Write the "current state" version (join on `is_current`). When would a business want each?
-3. Add Q11: average review-free "delivery promise gap" (estimated minus actual delivery days) by seller state.
+3. Add Q11: the average "delivery promise gap" (estimated minus actual delivery days) by seller state, for delivered orders only.
 4. Add a chart of monthly late-delivery rate to the Delivery tab.
 5. On Olist, what is the repeat rate? What does that tell you about the business?
 

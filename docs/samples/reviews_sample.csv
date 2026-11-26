@@ -1,0 +1,41 @@
+review_id,order_id,review_score,review_comment_title,review_comment_message,review_creation_date,review_answer_timestamp
+sample-review-01,sample-order-01,5,,"Chegou antes do prazo, produto ótimo. Recomendo!",2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-02,sample-order-02,1,,Até hoje não recebi o produto e ninguém responde meus emails.,2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-03,sample-order-03,5,,Muito bom,2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-04,sample-order-04,5,,muito bom!,2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-05,sample-order-05,2,,"O produto veio quebrado, a tampa estava rachada. Quero a troca.",2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-06,sample-order-06,1,Errado,Comprei a cor azul e veio vermelha.,2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-07,sample-order-07,3,,"Entrega demorou bastante, mas o produto é bom.",2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-08,sample-order-08,4,,Produto de boa qualidade pelo preço que paguei.,2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-09,sample-order-09,1,,Comprei dois itens e só chegou um. Aguardo o outro.,2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-10,sample-order-10,5,Excelente,"Loja séria, atendimento rápido e educado.",2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-11,sample-order-11,2,,"Não recomendo, material muito fraco, rasgou na primeira semana.",2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-12,sample-order-12,5,,,2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-13,sample-order-13,4,,,2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-14,sample-order-14,5,,Recomendo,2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-15,sample-order-15,1,,Pedido cancelado sem aviso e o reembolso ainda não caiu.,2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-16,sample-order-16,3,,"Produto ok, nada demais.",2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-17,sample-order-17,5,,"Entregue no prazo, tudo certinho.",2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-18,sample-order-18,2,,Chegou com 10 dias de atraso.,2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-19,sample-order-19,1,,"Péssimo. Produto falsificado, diferente da foto do anúncio.",2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-20,sample-order-20,4,,"Gostei, mas a embalagem veio amassada.",2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-21,sample-order-21,5,,"Perfeito, igual ao anúncio. Parabéns à loja.",2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-22,sample-order-22,1,,Não chegou até agora. Quero meu dinheiro de volta.,2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-23,sample-order-23,3,,O relógio é bonito mas a pulseira é menor do que esperava.,2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-24,sample-order-24,5,,"Super recomendo, preço ótimo comparado com outras lojas.",2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-25,sample-order-25,2,,"Veio o modelo errado, já abri reclamação.",2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-26,sample-order-26,4,,Entrega rápida.,2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-27,sample-order-27,1,,"Produto com defeito, não liga. Preciso de assistência.",2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-28,sample-order-28,5,,"Adorei a cadeira, muito confortável e fácil de montar.",2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-29,sample-order-29,3,,Demorou mas chegou.,2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-30,sample-order-30,5,,,2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-31,sample-order-31,4,,"Bom produto, recomendo a loja.",2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-32,sample-order-32,2,,Caro para a qualidade oferecida.,2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-33,sample-order-33,1,,Recebi a nota fiscal mas o produto nunca foi enviado. Absurdo!,2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-34,sample-order-34,5,,Ótimo,2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-35,sample-order-35,4,,Chegou bem embalado e dentro do prazo.,2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-36,sample-order-36,1,,"Comprei 3 unidades, recebi 2 e uma quebrada.",2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-37,sample-order-37,5,,"Vendedor atencioso, resolveu meu problema rapidamente.",2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-38,sample-order-38,3,,"Não é o que eu esperava, mas serve.",2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-39,sample-order-39,5,,Recomendo!,2018-03-01 00:00:00,2018-03-02 10:00:00
+sample-review-40,sample-order-40,2,,A cor é diferente da foto.,2018-03-01 00:00:00,2018-03-02 10:00:00
